@@ -1,4 +1,4 @@
-package client
+package main
 
 import (
 	"bufio"
@@ -6,7 +6,8 @@ import (
 	"net"
 	"os"
 	"strings"
-	"testing"
+
+	redis "github.com/dengzitong/redis/client"
 )
 
 var (
@@ -14,14 +15,15 @@ var (
 	Nil        = `(nil)`
 	Ok         = `OK`
 )
-
 var storage map[string]string = make(map[string]string)
 
-func asyncServe() (func(), string) {
-	listener, err := net.Listen("tcp", ":0")
+func asyncServe(addr string) func() {
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v", err.Error())
-		return func() { panic(err) }, ""
+		return func() {
+			panic(err)
+		}
 	}
 
 	stopServer := func() {
@@ -41,7 +43,7 @@ func asyncServe() (func(), string) {
 		}
 	}()
 
-	return stopServer, fmt.Sprintf("%s", listener.Addr())
+	return stopServer
 }
 
 func serverHandler(conn net.Conn) {
@@ -50,22 +52,19 @@ func serverHandler(conn net.Conn) {
 	}()
 
 	br := bufio.NewReader(conn)
-	rReader := NewRespReader(br)
+	rReader := redis.NewRespReader(br)
 
 	bw := bufio.NewWriter(conn)
-	rWriter := NewRespWriter(bw)
+	rWriter := redis.NewRespWriter(bw)
 
 	req, err := rReader.ParseRequest()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v", err)
 	}
-	fmt.Fprintf(os.Stdout, "parse request %s\n", req)
-
 	handerRequest(rWriter, req)
-
 }
 
-func handerRequest(rWriter *RespWriter, req [][]byte) error {
+func handerRequest(rWriter *redis.RespWriter, req [][]byte) error {
 	var (
 		cmd  string
 		args [][]byte
@@ -107,41 +106,8 @@ func handerRequest(rWriter *RespWriter, req [][]byte) error {
 	return err
 }
 
-func localAddr(s string) string {
-	if strings.Contains(s, "[::]") {
-		// [::]:12345
-		ss := strings.Split(s, ":")
-		return ss[3]
-	}
-	return strings.Split(s, ":")[1]
-}
-
-func TestClientPing(t *testing.T) {
-	stopServer, addr := asyncServe()
-	defer stopServer()
-	addr = localAddr(addr)
-
-	cli := NewClient(":" + addr)
-	if reply, err := String(cli.Do("PING")); err != nil {
-		t.Fatal(err)
-	} else if reply != "PONG" {
-		t.Fatal("Expected value does not match")
-	}
-}
-
-func TestClientSet(t *testing.T) {
-	stopServer, addr := asyncServe()
-	defer stopServer()
-	addr = localAddr(addr)
-
-	cli := NewClient(":6379")
-	defer cli.Close()
-
-	t.Run("set", func(t *testing.T) {
-		if reply, err := String(cli.Do("set", "x", "123")); err != nil {
-			t.Fatal(err)
-		} else if reply != Ok {
-			t.Fatalf("Expected value does not match: %s", reply)
-		}
-	})
+func main() {
+	stop := asyncServe("127.0.0.1:9999")
+	defer stop()
+	select {}
 }
