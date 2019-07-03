@@ -38,4 +38,27 @@ func main() {
 	} else if reply != client.NilReply {
 		panic(fmt.Sprintf("reply error %s", reply))
 	}
+
+	sentinelCli := client.NewClient("10.1.1.228:21001", client.DialReadTimeout(time.Second*5))
+	defer sentinelCli.Close()
+
+	if reply, err := client.Strings(sentinelCli.Do("sentinel", "master", "mymaster")); err != nil {
+		panic(err)
+	} else {
+		// fmt.Printf("master reply: %v ", reply)
+		_ = reply
+	}
+
+	if replys, err := client.MultiBulk(sentinelCli.Do("sentinel", "slaves", "mymaster")); err != nil {
+		panic(err)
+	} else {
+		for _, reply := range replys {
+			ss, err := client.Strings(reply, nil)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("slaves reply: %+s\n", ss)
+		}
+	}
+
 }

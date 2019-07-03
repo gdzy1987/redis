@@ -7,6 +7,10 @@ type (
 	RoleType int
 )
 
+type RClient interface {
+	Do(cmd string, args ...interface{}) (interface{}, error)
+}
+
 const (
 	SingleMode Mode = iota
 	SentinelMode
@@ -45,27 +49,38 @@ func NewTopology(addr string) (*Topology, error) {
 	return topology, nil
 }
 
-type RedisCluster struct {
-	TopologyGroup map[string]*Topology `json:"topology_group"`
-	Addrs         []string             `json:"addrs"`
-}
+type (
+	// service stop handle
+	Stop func() error
+	// on outer function send a signal to called
+	Cancel func() chan struct{}
+	Basic  interface {
+		Run() (Stop, Cancel)
+	}
+)
 
-type RedisSentinel struct {
-	TopologyGroup []*Topology `json:"topology_group"`
-	Addrs         []string    `json:"addrs"`
-}
+type TopologyHandler interface {
+	// Get the connection from the current topology
+	// And provide the current real master connection by the topology service
+	OnConns() ([]net.Conn, error)
 
-type RedisSingle struct {
-	TopologyGroup []*Topology `json:"topology_group"`
-	Addrs         []string    `json:"addrs"`
-}
-
-type RedisTopology interface {
+	// Topology server is runing
 	IsActivity() bool
-	OnConnect() (net.Conn, error)
+
+	// When the topology of the backend changes
+	// You need to notify the caller to re-adjust the entire cluster connection
+	IsChangeC() chan struct{}
+
+	// The implementor needs to implement Basic interface template
+	// Return the service callback method
+	Basic
 }
 
-func CreateTopology(mode Mode, addrs ...string) (RedisTopology, error) {
-
+func CreateTopologyer(mode Mode, addrs ...string) (t TopologyHandler, err error) {
+	switch mode {
+	case ClusterMode:
+	case SentinelMode:
+	case SingleMode:
+	}
 	return nil, nil
 }
