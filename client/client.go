@@ -40,9 +40,8 @@ type Client struct {
 func getProto(addr string) string {
 	if strings.Contains(addr, "/") {
 		return "unix"
-	} else {
-		return "tcp"
 	}
+	return "tcp"
 }
 
 func NewClient(addr string, dialOpts ...DialOption) *Client {
