@@ -8,8 +8,6 @@ import (
 	"net"
 	"sync/atomic"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type sizeWriter int64
@@ -42,7 +40,7 @@ func ConnectWithOptions(addr string, opt *Options) (*Conn, error) {
 
 	conn, err := opt.dial(getProto(addr), addr)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	if opt.useTLS {
@@ -58,7 +56,7 @@ func ConnectWithOptions(addr string, opt *Options) (*Conn, error) {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
 				conn.Close()
-				return nil, errors.WithStack(err)
+				return nil, err
 			}
 			tlsConfig.ServerName = host
 		}
@@ -66,7 +64,7 @@ func ConnectWithOptions(addr string, opt *Options) (*Conn, error) {
 		tlsConn := tls.Client(conn, tlsConfig)
 		if err := tlsConn.Handshake(); err != nil {
 			conn.Close()
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
 		conn = tlsConn
 	}
