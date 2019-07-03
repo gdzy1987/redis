@@ -45,8 +45,8 @@ func TestPing(t *testing.T) {
 	})
 }
 
-func TestCommand(t *testing.T) {
-	b, size := Command("ping")
+func TestCommandSize(t *testing.T) {
+	b, size := ConvertAcmdSize("ping")
 	if size != 14 {
 		t.Fatal("expected length not equal.")
 	}
@@ -54,3 +54,5 @@ func TestCommand(t *testing.T) {
 		t.Fatal("expected value not equal.")
 	}
 }
+
+
