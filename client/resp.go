@@ -14,8 +14,9 @@ type Error string
 func (err Error) Error() string { return string(err) }
 
 var (
-	okReply   interface{} = "OK"
-	pongReply interface{} = "PONG"
+	OkReply   interface{} = "OK"
+	PongReply interface{} = "PONG"
+	NilReply  interface{} = nil
 )
 
 type RespReader struct {
@@ -41,10 +42,10 @@ func (resp *RespReader) Parse() (interface{}, error) {
 		switch {
 		case len(line) == 3 && line[1] == 'O' && line[2] == 'K':
 			// Avoid allocation for frequent "+OK" response.
-			return okReply, nil
+			return OkReply, nil
 		case len(line) == 5 && line[1] == 'P' && line[2] == 'O' && line[3] == 'N' && line[4] == 'G':
 			// Avoid allocation in PING command benchmarks :)
-			return pongReply, nil
+			return PongReply, nil
 		default:
 			return string(line[1:]), nil
 		}

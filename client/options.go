@@ -31,6 +31,9 @@ func NewOption() *Options {
 		maxIdleConns:    4,
 		readBufferSize:  1024,
 		writeBufferSize: 1024,
+		dialer: &net.Dialer{
+			KeepAlive: time.Minute * 5,
+		},
 	}
 }
 

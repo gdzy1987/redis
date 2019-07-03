@@ -1,6 +1,8 @@
 // The client is the primary interface for redis. You must first create a client with redis address for working.
 //
 //     c := NewClient("127.0.0.1:6380")
+// or
+//     c := NewClient("127.0.0.1:6380",DialWriteTimeout(1024),DialPassword("1234"))
 //
 // The most important function for client is Do function to send commands to remote server.
 //

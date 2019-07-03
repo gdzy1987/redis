@@ -39,6 +39,7 @@ func ConnectWithOptions(addr string, opt *Options) (*Conn, error) {
 	if opt.dial == nil {
 		opt.dial = opt.dialer.Dial
 	}
+
 	conn, err := opt.dial(getProto(addr), addr)
 	if err != nil {
 		return nil, errors.WithStack(err)
