@@ -11,13 +11,16 @@ type RedisClusterTop struct {
 	TopGroup map[string]*Topology `json:"top_group"`
 	Addrs    []string             `json:"addrs"`
 
-	mu          sync.Mutex
+	mu sync.Mutex
+
 	initialized bool
-	changed     chan struct{}
-	brokend     chan struct{}
+
+	changed chan struct{}
+	brokend chan struct{}
+	stopped chan *RedisClusterTop
 }
 
-func createRedisClusterTop(addrs ...string) *RedisClusterTop {
+func CreateRedisClusterTop(addrs ...string) *RedisClusterTop {
 	r := &RedisClusterTop{}
 	r.TopGroup = make(map[string]*Topology)
 	r.Addrs = addrs
@@ -26,72 +29,94 @@ func createRedisClusterTop(addrs ...string) *RedisClusterTop {
 	return r
 }
 
-func (s *RedisClusterTop) peekAndCompare() {
-	update := func(ctx context.Context, s *RedisClusterTop) error {
+func (s *RedisClusterTop) Run() Stop {
+
+	s.repeatPeek()
+
+	return func() error {
+		s.stopped <- s
+		return nil
+	}
+}
+
+func (s *RedisClusterTop) peek(ctx context.Context) chan error {
+	errC := make(chan error)
+	go func() {
 		select {
 		case <-ctx.Done():
-			return nil
+			errC <- nil
+			return
+
 		default:
 			topInfos, err := ProbeTopology(ClusterMode, s.Addrs...)
 			if err != nil {
-				return err
+				errC <- err
+				return
 			}
+
+			update := func(s *RedisClusterTop, ss []string) {
+				s.mu.Lock()
+				defer s.mu.Unlock()
+				if _, exist := s.TopGroup[ss[0]]; !exist {
+					// If it has been initialized, the topology does not exist in the dictionary.
+					// The topology has changed.
+					if s.initialized {
+						errC <- ErrTopChanged
+						return
+					}
+					s.TopGroup[ss[0]] = &Topology{
+						Mode: ClusterMode,
+						Master: &NodeInfo{
+							RunID:  ss[0],
+							IpAddr: ss[1],
+						},
+						offset: -1,
+					}
+				}
+				errC <- err
+				return
+			}
+
 			for i, _ := range topInfos {
 				info := topInfos[i]
 				ss := strings.Split(info, ",")
 				if len(ss) < 2 {
-					return ErrProbe
+					errC <- ErrProbe
+					return
 				}
-				isChange := func() error {
-					s.mu.Lock()
-					defer s.mu.Unlock()
-					if _, exist := s.TopGroup[ss[0]]; !exist {
-						if s.initialized {
-							return ErrTopChanged
-						}
-						masterNodeInfo := &NodeInfo{
-							RunID:  ss[0],
-							IpAddr: ss[1],
-						}
-						s.TopGroup[ss[0]] = &Topology{
-							Mode:   ClusterMode,
-							Master: masterNodeInfo,
-							offset: -1,
-						}
-					}
-					return nil
-				}
-				if err = isChange(); err != nil {
-					return err
-				}
+				update(s, ss)
 			}
 		}
-		return nil
-	}
+	}()
+	return errC
+}
 
+func (s *RedisClusterTop) repeatPeek() {
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
 		for {
-			bgctx := context.Background()
-			ctx, cancel := context.WithTimeout(bgctx, time.Second*5)
-			defer cancel()
+			select {
+			case <-ticker.C:
+				bgctx := context.Background()
+				ctx, cancel := context.WithTimeout(bgctx, time.Second*5)
+				defer cancel()
 
-			if err := update(ctx, s); err != nil {
-				switch err {
+				switch <-s.peek(ctx) {
 				case ErrTopChanged:
 					s.changed <- struct{}{}
 				case ErrProbe:
 					s.brokend <- struct{}{}
 					return
 				}
-			}
 
-			if !s.initialized {
-				s.initialized = true
+				if !s.initialized {
+					s.initialized = true
+				}
+			case <-s.stopped:
+				return
 			}
-			<-ticker.C
 		}
 	}()
 }
