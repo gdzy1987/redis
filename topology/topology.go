@@ -7,10 +7,6 @@ type (
 	RoleType int
 )
 
-type RClient interface {
-	Do(cmd string, args ...interface{}) (interface{}, error)
-}
-
 const (
 	SingleMode Mode = iota
 	SentinelMode

@@ -95,38 +95,59 @@ func ConvertAcmdSize(cmd string, args ...interface{}) ([]byte, int) {
 	return buf.Bytes(), len(buf.Bytes())
 }
 
-type info struct {
-	id       string
-	ip       string
-	isMaster bool
-	masterId string
+type masterInfo struct {
+	id string
+	ip string
 }
 
-func (i *info) String() string {
-	var master string = "0"
-	if i.isMaster {
-		master = "1"
-	}
-	if len(i.masterId) == 0 {
-		i.masterId = "nil"
-	}
-	return strings.Join([]string{i.id, i.ip, master, i.masterId}, ",")
+func (i *masterInfo) String() string {
+	return strings.Join([]string{i.id, i.ip}, ",")
 }
 
 // Find the current topology based on the command
 // And return the cropping information of the current topology
-func ProbeTopology(mode Mode, rcli RClient, addrs ...string) ([]string, error) {
-	var res []string
+func ProbeTopology(mode Mode, addrs ...string) ([]string, error) {
+	var redisClient *c.Client
+
+	if reached, err := Ping(addrs...); err != nil {
+		return nil, err
+	} else if len(reached) < 1 {
+		return nil, errors.New("all addresses are unreachable")
+	} else {
+		redisClient = c.NewClient(reached[0])
+	}
+	var info interface{}
 
 	switch mode {
-	case ClusterMode:
-		line, err := c.String(rcli.Do("cluster", "nodes"))
+	case SentinelMode:
+		ss, err := c.Strings(redisClient.Do("sentinel", "master", "mymaster"))
 		if err != nil {
 			return nil, err
 		}
+		info = ss
+	case ClusterMode:
+		s, err := c.String(redisClient.Do("clsuter", "nodes"))
+		if err != nil {
+			return nil, err
+		}
+		info = s
+	case SingleMode:
+		info = addrs[0]
+	}
+	return parsedByInfo(mode, info)
+}
+
+func parsedByInfo(m Mode, info interface{}) ([]string, error) {
+	var res []string
+	switch m {
+	case ClusterMode:
+		line, ok := info.(string)
+		if !ok {
+			return nil, errors.New("the info that needs to be parsed is not the type string is needed")
+		}
 		/*
 			# this 3 master and  3 slave cluster model info
-			# need beautify cropping to [$RunID,$realIPaddress,$Role,$MasterRunID]
+			# need beautify cropping to [$RunID,$realIPaddress]
 			cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922
 			c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460
 			885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383
@@ -134,55 +155,74 @@ func ProbeTopology(mode Mode, rcli RClient, addrs ...string) ([]string, error) {
 			a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected
 			62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected
 		*/
+
 		ss := strings.Split(line, "\n")
-		length := len(ss)
+		length := len(ss) - 1
 		if length < 1 {
-			return nil, errors.New("probe execute cmd result empty")
+			return nil, errors.New("parsed cmd result empty")
 		}
-		res = make([]string, length, length)
+		res = make([]string, length/2, length/2)
 		for i := 0; i < length; i++ {
 			infoStr := ss[i]
+			if !strings.Contains(infoStr, MasterStr) {
+				// just collect master info
+				continue
+			}
 			infoSS := strings.Split(infoStr, " ")
 			if len(infoSS) < 4 {
 				return nil, errors.New("parsed cluster mode line info error")
 			}
 
-			var isMaster bool
-			if strings.Contains(infoStr, MasterStr) {
-				isMaster = true
-			}
-
-			var masterId string
-			if isMaster {
-				masterId = string(infoStr[3])
-			}
-
-			info := &info{
-				id:       string(infoStr[0]),
-				ip:       string(infoStr[1]),
-				isMaster: isMaster,
-				masterId: masterId,
+			tmpIp := infoSS[1]
+			infoIp := strings.Join([]string{
+				strings.Split(string(tmpIp), ":")[0],
+				strings.Split(string(tmpIp), "@")[1],
+			}, ":")
+			info := &masterInfo{
+				id: string(infoSS[0]),
+				ip: infoIp,
 			}
 			res[i] = info.String()
 		}
+
 	case SentinelMode:
-		masterSS, err := c.Strings(rcli.Do("sentinel", "master", "mymaster"))
-		if err != nil {
-			return nil, err
+		masterSS, ok := info.([]string)
+		if !ok {
+			return nil, errors.New("the info that needs to be parsed is not the type []string is needed")
 		}
+		/*
+			# this 1 master sentinel model
+			# need beautify cropping to [$Runid,$realIPaddress]
+
+			 1) "name"
+			 2) "mymaster"
+			 3) "ip"
+			 4) "10.1.1.228"
+			 5) "port"
+			 6) "8003"
+			 7) "runid"
+			 8) "8be9401d095b9072b2e67c59fea68894e14da193"
+			 9) "flags"
+			10) "master"
+			11) "link-pending-commands"
+			....
+			....
+		*/
 		m := sliceStr2Dict(masterSS)
 		infoStr := fieldSplicing(m, "runid", "ip", "port")
 		ss := strings.Split(infoStr, ",")
-		info := &info{
-			id:       ss[0],
-			ip:       ss[1] + ":" + ss[2],
-			isMaster: true,
-			masterId: "",
+		info := &masterInfo{
+			id: ss[0],
+			ip: ss[1] + ":" + ss[2],
 		}
 		res = []string{info.String()}
-		// 要不要继续拿slave的地址
-	case SingleMode:
 
+	case SingleMode:
+		addr, ok := info.(string)
+		if !ok {
+			return nil, errors.New("the info that needs to be parsed is not the type []string is needed")
+		}
+		res = []string{addr}
 	}
 
 	return res, nil
