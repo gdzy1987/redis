@@ -49,9 +49,9 @@ func main() {
 ```
 
 
-### Analog a redis handle
+### Analog a redis handler
 
-```
+```golang
 package main
 
 import (
@@ -174,9 +174,9 @@ func main() {
 	defer stop()
 	select {}
 }
+```
 
-
-
+``` shell
 echo "set x 123" | redis-cli -p 9999
 echo "get x" | redis-cli -p 9999
 ```
