@@ -45,7 +45,7 @@ func main() {
 	if reply, err := client.Strings(sentinelCli.Do("sentinel", "master", "mymaster")); err != nil {
 		panic(err)
 	} else {
-		// fmt.Printf("master reply: %v ", reply)
+		fmt.Printf("reply value: %s", reply)
 		_ = reply
 	}
 
