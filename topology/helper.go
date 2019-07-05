@@ -6,12 +6,58 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	c "github.com/dengzitong/redis/client"
 )
+
+type SelectionType string
+
+const (
+	Server      SelectionType = "Server"
+	Clients     SelectionType = "Clients"
+	Memory      SelectionType = "Memory"
+	Persistence SelectionType = "Persistence"
+	Stats       SelectionType = "Stats"
+	Replication SelectionType = "Replication"
+	CPU         SelectionType = "CPU"
+	Cluster     SelectionType = "Cluster"
+	Keyspace    SelectionType = "Keyspace"
+)
+
+//exec another process
+//if wait d Duration, it will kill the process
+//d is <= 0, wait forever
+func ExecTimeout(d time.Duration, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	if d <= 0 {
+		return cmd.Wait()
+	}
+
+	done := make(chan error)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case <-time.After(d):
+		cmd.Process.Kill()
+
+		//wait goroutine return
+		return <-done
+	case err := <-done:
+		return err
+	}
+}
 
 // Ping analog icmp detection
 // Probe multiple addresses and return the address port that is currently responding within seconds
@@ -95,38 +141,59 @@ func ConvertAcmdSize(cmd string, args ...interface{}) ([]byte, int) {
 	return buf.Bytes(), len(buf.Bytes())
 }
 
-type info struct {
-	id       string
-	ip       string
-	isMaster bool
-	masterId string
+type masterInfo struct {
+	id string
+	ip string
 }
 
-func (i *info) String() string {
-	var master string = "0"
-	if i.isMaster {
-		master = "1"
-	}
-	if len(i.masterId) == 0 {
-		i.masterId = "nil"
-	}
-	return strings.Join([]string{i.id, i.ip, master, i.masterId}, ",")
+func (i *masterInfo) String() string {
+	return strings.Join([]string{i.id, i.ip}, ",")
 }
 
 // Find the current topology based on the command
 // And return the cropping information of the current topology
-func ProbeTopology(mode Mode, rcli RClient, addrs ...string) ([]string, error) {
-	var res []string
+func ProbeTopology(mode Mode, addrs ...string) ([]string, error) {
+	var redisClient *c.Client
+
+	if reached, err := Ping(addrs...); err != nil {
+		return nil, err
+	} else if len(reached) < 1 {
+		return nil, errors.New("all addresses are unreachable")
+	} else {
+		redisClient = c.NewClient(reached[0])
+	}
+	var info interface{}
 
 	switch mode {
-	case ClusterMode:
-		line, err := c.String(rcli.Do("cluster", "nodes"))
+	case SentinelMode:
+		ss, err := c.Strings(redisClient.Do("sentinel", "master", "mymaster"))
 		if err != nil {
 			return nil, err
 		}
+		info = ss
+	case ClusterMode:
+		s, err := c.String(redisClient.Do("cluster", "nodes"))
+		if err != nil {
+			return nil, err
+		}
+		info = s
+	case SingleMode:
+		info = addrs[0]
+	}
+	return ParsedByInfo(mode, info)
+}
+
+func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
+	var res []string
+	switch m {
+	case ClusterMode:
+		line, ok := info.(string)
+		if !ok {
+			return nil, errors.New("the info that needs to be parsed is not the type string is needed")
+		}
 		/*
 			# this 3 master and  3 slave cluster model info
-			# need beautify cropping to [$RunID,$realIPaddress,$Role,$MasterRunID]
+			# need beautify cropping to [$RunID,$realIPaddress]
 			cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922
 			c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460
 			885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383
@@ -134,55 +201,75 @@ func ProbeTopology(mode Mode, rcli RClient, addrs ...string) ([]string, error) {
 			a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected
 			62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected
 		*/
+
 		ss := strings.Split(line, "\n")
-		length := len(ss)
+		length := len(ss) - 1
 		if length < 1 {
-			return nil, errors.New("probe execute cmd result empty")
+			return nil, errors.New("parsed cmd result empty")
 		}
-		res = make([]string, length, length)
+		res = make([]string, 0)
 		for i := 0; i < length; i++ {
 			infoStr := ss[i]
+			if !strings.Contains(infoStr, MasterStr) {
+				// just collect master info
+				continue
+			}
+			if strings.Contains(infoStr, "fail") {
+				// just collect non fail master info
+				continue
+			}
 			infoSS := strings.Split(infoStr, " ")
 			if len(infoSS) < 4 {
 				return nil, errors.New("parsed cluster mode line info error")
 			}
 
-			var isMaster bool
-			if strings.Contains(infoStr, MasterStr) {
-				isMaster = true
+			tmpIp := infoSS[1]
+			infoIp := strings.Split(string(tmpIp), "@")[0]
+			info := &masterInfo{
+				id: string(infoSS[0]),
+				ip: infoIp,
 			}
-
-			var masterId string
-			if isMaster {
-				masterId = string(infoStr[3])
-			}
-
-			info := &info{
-				id:       string(infoStr[0]),
-				ip:       string(infoStr[1]),
-				isMaster: isMaster,
-				masterId: masterId,
-			}
-			res[i] = info.String()
+			res = append(res, info.String())
 		}
+
 	case SentinelMode:
-		masterSS, err := c.Strings(rcli.Do("sentinel", "master", "mymaster"))
-		if err != nil {
-			return nil, err
+		masterSS, ok := info.([]string)
+		if !ok {
+			return nil, errors.New("the info that needs to be parsed is not the type []string is needed")
 		}
+		/*
+			# this 1 master sentinel model
+			# need beautify cropping to [$Runid,$realIPaddress]
+
+			 1) "name"
+			 2) "mymaster"
+			 3) "ip"
+			 4) "10.1.1.228"
+			 5) "port"
+			 6) "8003"
+			 7) "runid"
+			 8) "8be9401d095b9072b2e67c59fea68894e14da193"
+			 9) "flags"
+			10) "master"
+			11) "link-pending-commands"
+			....
+			....
+		*/
 		m := sliceStr2Dict(masterSS)
 		infoStr := fieldSplicing(m, "runid", "ip", "port")
 		ss := strings.Split(infoStr, ",")
-		info := &info{
-			id:       ss[0],
-			ip:       ss[1] + ":" + ss[2],
-			isMaster: true,
-			masterId: "",
+		info := &masterInfo{
+			id: ss[0],
+			ip: ss[1] + ":" + ss[2],
 		}
 		res = []string{info.String()}
-		// 要不要继续拿slave的地址
-	case SingleMode:
 
+	case SingleMode:
+		addr, ok := info.(string)
+		if !ok {
+			return nil, errors.New("the info that needs to be parsed is not the type []string is needed")
+		}
+		res = []string{addr}
 	}
 
 	return res, nil
@@ -208,4 +295,115 @@ func fieldSplicing(m map[string]string, cols ...string) string {
 		ss[i] = val
 	}
 	return strings.Join(ss, ",")
+}
+
+func ProbeNode(addr string, pwd string) (map[SelectionType]map[string]string, error) {
+	var redisClient *c.Client
+	if len(pwd) < 1 {
+		redisClient = c.NewClient(addr)
+	} else {
+		redisClient = c.NewClient(addr, c.DialPassword(pwd))
+	}
+	line, err := c.String(redisClient.Do("info"))
+	if err != nil {
+		return nil, err
+	}
+	return ParsedNodeInfo(line), nil
+}
+
+// parsedNodeInfo parse the bulk string returned by the redis info command
+func ParsedNodeInfo(line string) map[SelectionType]map[string]string {
+	redisInfo := make(map[SelectionType]map[string]string)
+	strList := strings.Split(line, "\n")
+	selection := ""
+	for i, _ := range strList {
+		line := strings.TrimSpace(strList[i])
+		if line == "" || len(line) == 0 {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			selection = strings.TrimSpace(line[1:])
+			redisInfo[SelectionType(selection)] = make(map[string]string)
+			continue
+		}
+		contentList := strings.Split(line, ":")
+		redisInfo[SelectionType(selection)][contentList[0]] = contentList[1]
+	}
+	return redisInfo
+}
+
+// parsing information about the replication selection
+func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
+	/*
+		role:master
+		connected_slaves:1
+		slave0:ip=10.1.1.228,port=7004,state=online,offset=3689968249,lag=1
+		master_replid:17270cf205f7c98c4c8e80c348fd0564132e6643
+		master_replid2:0000000000000000000000000000000000000000
+		...
+		...
+	*/
+	if len(m) < 1 {
+		return nil, errors.New("selection replication empty")
+	}
+	slaveReg, _ := regexp.Compile("^slave([0-9]*)")
+	slaveMapping := make(map[string]string)
+
+	tmpInfolines := make([]string, 0)
+	for key, value := range m {
+		if !slaveReg.MatchString(key) {
+			continue
+		}
+		infoss := strings.Split(value, ",")
+		if len(infoss) < 2 {
+			return nil, errors.New("parsed slave node error")
+		}
+		for _, info := range infoss {
+			// ip=10.1.1.228
+			infoLine := strings.Split(info, "=")
+			tmpInfolines = append(tmpInfolines, infoLine...)
+		}
+		args := sliceStr2Dict(tmpInfolines)
+		slaveMapping[key] =
+			strings.Join(
+				strings.Split(fieldSplicing(args, "ip", "port"), ","),
+				":",
+			)
+	}
+	return slaveMapping, nil
+}
+
+// ParsedSlaveInfo call the probeNodeInfo function to implement the NodeInfo initialization parameters
+func ParsedSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
+	/*
+		map[string]string{"slave0":"10.1.1.228:7004"}
+	*/
+	res := make([]*NodeInfo, 0)
+	for _, v := range s {
+		allInfoMap, err := ProbeNode(v, pwd)
+		if err != nil {
+			return nil, err
+		}
+		selectionServerMap, exist := allInfoMap[Server]
+		if !exist {
+			return nil, errors.New("probe info error")
+		}
+		version, exist := selectionServerMap["redis_version"]
+		if !exist {
+			return nil, errors.New("selection Server.redis_version not exist")
+		}
+
+		runid, exist := selectionServerMap["run_id"]
+		if !exist {
+			return nil, errors.New("selection Server.run_id not exist")
+		}
+
+		nio := &NodeInfo{
+			Version: version,
+			RunID:   runid,
+			IpAddr:  v,
+		}
+		res = append(res, nio)
+	}
+	return res, nil
 }

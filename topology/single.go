@@ -5,6 +5,7 @@ import "net"
 type RedisSingleTop struct {
 	TopologyGroup []*Topology `json:"topology_group"`
 	Addrs         []string    `json:"addrs"`
+	GlobalOffset  int64       `json:"offset"`
 }
 
 func createRedisSingleTop() *RedisSingleTop {
