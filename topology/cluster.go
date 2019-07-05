@@ -116,7 +116,7 @@ func (s *RedisClusterTop) updateIncr(incrs []*NodeInfo) {
 				Offset: -1,
 			}
 			nt.CollectSlaves()
-			s.TopologyGroup[nt.Fingerprint] = t
+			s.TopologyGroup[nt.Fingerprint] = nt
 			continue
 		}
 		t.ResetMaster(node)
