@@ -110,10 +110,11 @@ func (s *RedisClusterTop) updateIncr(incrs []*NodeInfo) {
 		t, ok := s.query(node.RunID)
 		if !ok {
 			nt := &Topology{
-				Mode:   ClusterMode,
-				Master: node,
-				Slaves: make([]*NodeInfo, 0),
-				Offset: -1,
+				Fingerprint: node.RunID,
+				Mode:        ClusterMode,
+				Master:      node,
+				Slaves:      make([]*NodeInfo, 0),
+				Offset:      -1,
 			}
 			nt.CollectSlaves()
 			s.TopologyGroup[nt.Fingerprint] = nt
@@ -145,7 +146,7 @@ func (s *RedisClusterTop) query(fp string) (*Topology, bool) {
 			return topology, true
 		}
 	}
-	return nil, false
+	return &Topology{}, false
 }
 
 func (s *RedisClusterTop) peek(ctx context.Context) error {
