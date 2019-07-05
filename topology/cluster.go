@@ -2,138 +2,234 @@ package topology
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
 )
 
-type RedisClusterTop struct {
-	TopGroup map[string]*Topology `json:"top_group"`
-	Addrs    []string             `json:"addrs"`
-
-	mu sync.Mutex
-
-	initialized bool
-
-	changed chan struct{}
-	brokend chan struct{}
-	stopped chan *RedisClusterTop
+type nodeGroup struct {
+	l sync.Mutex
+	m map[string]*NodeInfo
 }
 
-func CreateRedisClusterTop(addrs ...string) *RedisClusterTop {
-	r := &RedisClusterTop{}
-	r.TopGroup = make(map[string]*Topology)
-	r.Addrs = addrs
-	r.changed = make(chan struct{})
-	r.brokend = make(chan struct{})
-	return r
-}
-
-func (s *RedisClusterTop) Run() Stop {
-
-	s.repeatPeek()
-
-	return func() error {
-		s.stopped <- s
-		return nil
+func newNodeGroup() *nodeGroup {
+	return &nodeGroup{
+		l: sync.Mutex{},
+		m: make(map[string]*NodeInfo),
 	}
 }
 
-func (s *RedisClusterTop) peek(ctx context.Context) chan error {
-	errC := make(chan error)
-	go func() {
-		select {
-		case <-ctx.Done():
-			errC <- nil
-			return
+func (g *nodeGroup) put(node *NodeInfo) {
+	g.l.Lock()
+	defer g.l.Unlock()
+	g.m[node.RunID] = node
+}
 
-		default:
-			topInfos, err := ProbeTopology(ClusterMode, s.Addrs...)
-			if err != nil {
-				errC <- err
-				return
+func (g *nodeGroup) diff(ng *nodeGroup) (increased []*NodeInfo, decreasd []*NodeInfo, hasdiff bool) {
+	g.l.Lock()
+	defer g.l.Unlock()
+	ng.l.Lock()
+	defer ng.l.Unlock()
+	for name, nodeInfo := range ng.m {
+		if _, exist := g.m[name]; !exist {
+			if increased == nil {
+				increased = make([]*NodeInfo, 0)
 			}
-
-			update := func(s *RedisClusterTop, ss []string) {
-				s.mu.Lock()
-				defer s.mu.Unlock()
-				if _, exist := s.TopGroup[ss[0]]; !exist {
-					// If it has been initialized, the topology does not exist in the dictionary.
-					// The topology has changed.
-					if s.initialized {
-						errC <- ErrTopChanged
-						return
-					}
-					s.TopGroup[ss[0]] = &Topology{
-						Mode: ClusterMode,
-						Master: &NodeInfo{
-							RunID:  ss[0],
-							IpAddr: ss[1],
-						},
-						offset: -1,
-					}
-				}
-				errC <- err
-				return
-			}
-
-			for i, _ := range topInfos {
-				info := topInfos[i]
-				ss := strings.Split(info, ",")
-				if len(ss) < 2 {
-					errC <- ErrProbe
-					return
-				}
-				update(s, ss)
-			}
+			increased = append(increased, nodeInfo)
+			hasdiff = true
 		}
-	}()
-	return errC
+	}
+
+	for name, nodeInfo := range g.m {
+		if _, exist := ng.m[name]; !exist {
+			if decreasd == nil {
+				decreasd = make([]*NodeInfo, 0)
+			}
+			decreasd = append(decreasd, nodeInfo)
+			hasdiff = true
+		}
+	}
+
+	return increased, decreasd, hasdiff
+}
+
+type RedisClusterTop struct {
+	Addrs         []string             `json:"addrs"`
+	TopologyGroup map[string]*Topology `json:"group"`
+
+	incrNodeInfos []*NodeInfo
+	decrNodeInfos []*NodeInfo
+
+	mu  sync.Mutex
+	one sync.Once
+
+	changed chan struct{}
+	stopped chan *RedisClusterTop
+
+	initialized bool
+}
+
+func CreateRedisClusterTopFromAddrs(addrs ...string) *RedisClusterTop {
+	r := &RedisClusterTop{
+		one: sync.Once{},
+	}
+	r.TopologyGroup = make(map[string]*Topology)
+	r.Addrs = addrs
+	r.changed = make(chan struct{})
+
+	return r
+}
+
+func CreateRedisClusterTopFromStream(p []byte) (*RedisClusterTop, error) {
+	rs := &RedisClusterTop{}
+	err := json.Unmarshal(p, rs)
+	if err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+func (s *RedisClusterTop) Run() Stop {
+	s.repeatPeek()
+
+	stop := func() error {
+		s.stopped <- s
+		return nil
+	}
+
+	return stop
+}
+
+func (s *RedisClusterTop) updateIncr(incrs []*NodeInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.incrNodeInfos = incrs
+	for i, _ := range incrs {
+		node := incrs[i]
+		t, ok := s.query(node.RunID)
+		if !ok {
+			nt := &Topology{
+				Mode:   ClusterMode,
+				Master: node,
+				Slaves: make([]*NodeInfo, 0),
+				Offset: -1,
+			}
+			s.TopologyGroup[node.RunID] = nt
+			continue
+		}
+		t.Master = node
+		t.Slaves = t.Slaves[:0]
+	}
+}
+
+func (s *RedisClusterTop) updateDecr(decr []*NodeInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.decrNodeInfos = decr
+	for i, _ := range decr {
+		node := decr[i]
+		t, ok := s.query(node.RunID)
+		if !ok {
+			continue
+		}
+		delete(s.TopologyGroup, t.Fingerprint)
+	}
+}
+
+func (s *RedisClusterTop) query(fp string) (*Topology, bool) {
+	for ffp, topology := range s.TopologyGroup {
+		if fpComparison(ffp, fp) {
+			return topology, true
+		}
+	}
+	return nil, false
+}
+
+func (s *RedisClusterTop) peek(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		topInfos, err := ProbeTopology(ClusterMode, s.Addrs...)
+		if err != nil {
+			return err
+		}
+
+		nng := newNodeGroup()
+		for i, _ := range topInfos {
+			info := topInfos[i]
+			ss := strings.Split(info, ",")
+			if len(ss) < 2 {
+				return ErrProbe
+			}
+			nng.put(&NodeInfo{RunID: ss[0], IpAddr: ss[1]})
+		}
+
+		update := func(s *RedisClusterTop, nng *nodeGroup) error {
+			sndg := newNodeGroup()
+			for _, t := range s.TopologyGroup {
+				sndg.put(t.Master)
+			}
+			incrs, decrs, hasdiff := sndg.diff(nng)
+			if hasdiff {
+				s.updateIncr(incrs)
+				s.updateDecr(decrs)
+				if s.initialized {
+					return ErrTopChanged
+				}
+			}
+			return nil
+		}
+		if err := update(s, nng); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *RedisClusterTop) repeatPeek() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 
 		for {
 			select {
-			case <-ticker.C:
-				bgctx := context.Background()
-				ctx, cancel := context.WithTimeout(bgctx, time.Second*5)
-				defer cancel()
-
-				switch <-s.peek(ctx) {
-				case ErrTopChanged:
-					s.changed <- struct{}{}
-				case ErrProbe:
-					s.brokend <- struct{}{}
-					return
-				}
-
-				if !s.initialized {
-					s.initialized = true
-				}
 			case <-s.stopped:
 				return
+			default:
 			}
+
+			bgctx := context.Background()
+			ctx, cancel := context.WithTimeout(bgctx, time.Second*20)
+			defer cancel()
+			switch s.peek(ctx) {
+			case ErrTopChanged:
+				s.changed <- struct{}{}
+			case ErrProbe:
+				panic(ErrProbe)
+			}
+			if !s.initialized {
+				s.initialized = true
+				s.one.Do(func() { s.changed <- struct{}{} })
+			}
+			<-ticker.C
 		}
 	}()
 }
 
-func (s *RedisClusterTop) GetNodeInfos() []*NodeInfo {
-	s.mu.Lock()
-	length := len(s.Addrs) / 2
-	nodes := make([]*NodeInfo, length, length)
-	i := 0
-	for _, top := range s.TopGroup {
-		nodes[i] = top.Master
-		i++
-	}
-	s.mu.Unlock()
-	return nodes
+func (s *RedisClusterTop) ReceiveNodeInfos() (active <-chan []*NodeInfo, dead <-chan []*NodeInfo) {
+	additionNodes := make(chan []*NodeInfo)
+	deleteNodes := make(chan []*NodeInfo)
+
+	go func(s *RedisClusterTop) {
+		for range s.changed {
+			s.mu.Lock()
+			nodes := s.incrNodeInfos
+			s.mu.Unlock()
+			additionNodes <- nodes
+		}
+	}(s)
+
+	return additionNodes, deleteNodes
 }
-
-func (s *RedisClusterTop) IsActivity() <-chan struct{} { return s.brokend }
-
-func (s *RedisClusterTop) IsChanged() <-chan struct{} { return s.changed }

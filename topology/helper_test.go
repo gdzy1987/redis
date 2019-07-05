@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net"
 	"testing"
+	"time"
 )
 
 func listener(addrs ...string) []net.Listener {
@@ -107,7 +108,7 @@ a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbd
 	}
 )
 
-func TestProbeTop(t *testing.T) {
+func TestProbeTopParsedByInfo(t *testing.T) {
 
 	clusterAddrs, err := parsedByInfo(ClusterMode, ClusterNodeInfo)
 	if err != nil {
@@ -128,5 +129,21 @@ func TestProbeTop(t *testing.T) {
 		t.Fatal(err)
 	} else if len(singleAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
+	}
+}
+
+func TestExec(t *testing.T) {
+	err := ExecTimeout(time.Second*1, "ps", "-ef")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProbeFunc(t *testing.T) {
+	ss, err := ProbeTopology(ClusterMode, "10.1.1.228:7001")
+	if err != nil {
+		t.Fatal(err)
+	} else if len(ss) < 1 {
+		t.Fatal("expected cluster node")
 	}
 }
