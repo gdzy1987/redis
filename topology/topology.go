@@ -38,7 +38,44 @@ type Topology struct {
 	Offset      int64       `json:"top_offset"`
 }
 
-func (t *Topology) FingerprintCorrection(s string) {
+// replace Master node
+func (t *Topology) ResetMaster(n *NodeInfo) {
+	t.Fingerprint = n.RunID
+	t.Master = n
+}
+
+// cluster mode data node
+func (t *Topology) CollectSlaves() {
+	if t.Slaves == nil {
+		t.Slaves = make([]*NodeInfo, 0)
+	}
+	// if there is old information you need to clear
+	t.Slaves = t.Slaves[:0]
+
+	// this is a serious mistake
+	ms, err := ProbeNode(t.Master.IpAddr, "")
+	if err != nil {
+		panic(err)
+	}
+	replicationInfoMap, exits := ms[Replication]
+	if !exits {
+		panic("probe node info not exists replication selection")
+	}
+	slaveMap, err := ParsedReplicationInfo(replicationInfoMap)
+	if err != nil {
+		panic(err)
+	}
+	nodeInfos, err := ParsedSlaveInfo(slaveMap, "")
+	if err != nil {
+		panic(err)
+	}
+	for _, n := range nodeInfos {
+		t.fingerprintCorrection(n.RunID)
+	}
+	t.Slaves = nodeInfos
+}
+
+func (t *Topology) fingerprintCorrection(s string) {
 	if strings.Contains(t.Fingerprint, s) {
 		return
 	}

@@ -115,11 +115,13 @@ func (s *RedisClusterTop) updateIncr(incrs []*NodeInfo) {
 				Slaves: make([]*NodeInfo, 0),
 				Offset: -1,
 			}
-			s.TopologyGroup[node.RunID] = nt
+			nt.CollectSlaves()
+			s.TopologyGroup[nt.Fingerprint] = t
 			continue
 		}
-		t.Master = node
-		t.Slaves = t.Slaves[:0]
+		t.ResetMaster(node)
+		t.CollectSlaves()
+		s.TopologyGroup[t.Fingerprint] = t
 	}
 }
 
@@ -190,7 +192,7 @@ func (s *RedisClusterTop) peek(ctx context.Context) error {
 
 func (s *RedisClusterTop) repeatPeek() {
 	go func() {
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
 		for {
@@ -201,7 +203,7 @@ func (s *RedisClusterTop) repeatPeek() {
 			}
 
 			bgctx := context.Background()
-			ctx, cancel := context.WithTimeout(bgctx, time.Second*20)
+			ctx, cancel := context.WithTimeout(bgctx, time.Second*5)
 			defer cancel()
 			switch s.peek(ctx) {
 			case ErrTopChanged:
@@ -225,11 +227,22 @@ func (s *RedisClusterTop) ReceiveNodeInfos() (add <-chan []*NodeInfo, del <-chan
 	go func(s *RedisClusterTop) {
 		for range s.changed {
 			s.mu.Lock()
-			nodes := s.incrNodeInfos
+			addnodes := cuttingNodeSlice(s.incrNodeInfos)
+			delnodes := cuttingNodeSlice(s.decrNodeInfos)
 			s.mu.Unlock()
-			additionNodes <- nodes
+			additionNodes <- addnodes
+			deleteNodes <- delnodes
 		}
 	}(s)
 
 	return additionNodes, deleteNodes
+}
+
+func cuttingNodeSlice(s []*NodeInfo) []*NodeInfo {
+	res := make([]*NodeInfo, len(s), len(s))
+	for i := 0; i < len(s); i++ {
+		res[i] = s[i]
+	}
+	s = s[:0]
+	return res
 }

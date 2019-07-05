@@ -224,10 +224,7 @@ func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
 			}
 
 			tmpIp := infoSS[1]
-			infoIp := strings.Join([]string{
-				strings.Split(string(tmpIp), ":")[0],
-				strings.Split(string(tmpIp), "@")[1],
-			}, ":")
+			infoIp := strings.Split(string(tmpIp), "@")[0]
 			info := &masterInfo{
 				id: string(infoSS[0]),
 				ip: infoIp,

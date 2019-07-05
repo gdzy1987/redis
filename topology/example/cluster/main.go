@@ -10,7 +10,7 @@ import (
 
 func main() {
 	log.SetOutput(os.Stdout)
-	cluster := topology.CreateRedisClusterTopFromAddrs("10.1.1.228:7001", "10.1.1.228:7002", "10.1.1.228:7003")
+	cluster := topology.CreateRedisClusterTopFromAddrs("10.1.1.228:7001", "10.1.1.228:7002")
 
 	stop := cluster.Run()
 	defer stop()
@@ -22,13 +22,17 @@ func main() {
 			if !ok {
 				return
 			}
-			fmt.Printf("add node %#v\n", nodes)
+			for _, node := range nodes {
+				fmt.Printf("add node %v\n", node)
+			}
 
 		case nodes, ok := <-d:
 			if !ok {
 				return
 			}
-			fmt.Printf("delete node %#v\n", nodes)
+			for _, node := range nodes {
+				fmt.Printf("delete node %v\n", node)
+			}
 		}
 	}
 
