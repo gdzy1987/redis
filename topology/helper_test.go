@@ -110,21 +110,21 @@ a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbd
 
 func TestProbeTopParsedByInfo(t *testing.T) {
 
-	clusterAddrs, err := parsedByInfo(ClusterMode, ClusterNodeInfo)
+	clusterAddrs, err := ParsedByInfo(ClusterMode, ClusterNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(clusterAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	sentinelAddrs, err := parsedByInfo(SentinelMode, SentinelNodeInfo)
+	sentinelAddrs, err := ParsedByInfo(SentinelMode, SentinelNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(sentinelAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	singleAddrs, err := parsedByInfo(SingleMode, "localhost:1234")
+	singleAddrs, err := ParsedByInfo(SingleMode, "localhost:1234")
 	if err != nil {
 		t.Fatal(err)
 	} else if len(singleAddrs) < 1 {

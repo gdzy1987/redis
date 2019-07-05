@@ -180,10 +180,10 @@ func ProbeTopology(mode Mode, addrs ...string) ([]string, error) {
 	case SingleMode:
 		info = addrs[0]
 	}
-	return parsedByInfo(mode, info)
+	return ParsedByInfo(mode, info)
 }
 
-func parsedByInfo(m Mode, info interface{}) ([]string, error) {
+func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
 	var res []string
 	switch m {
 	case ClusterMode:
