@@ -349,9 +349,10 @@ func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
 	if len(m) < 1 {
 		return nil, errors.New("selection replication empty")
 	}
-	slaveReg, _ := regexp.Compile("slave*")
+	slaveReg, _ := regexp.Compile("^slave([0-9]*)")
 	slaveMapping := make(map[string]string)
 
+	tmpInfolines := make([]string, 0)
 	for key, value := range m {
 		if !slaveReg.MatchString(key) {
 			continue
@@ -361,17 +362,16 @@ func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
 			return nil, errors.New("parsed slave node error")
 		}
 		for _, info := range infoss {
+			// ip=10.1.1.228
 			infoLine := strings.Split(info, "=")
-			if len(infoLine) < 3 {
-				return nil, errors.New("parsed slave node split info error")
-			}
-			args := sliceStr2Dict(infoLine)
-			slaveMapping[key] =
-				strings.Join(
-					strings.Split(fieldSplicing(args, "ip", "port"), ","),
-					":",
-				)
+			tmpInfolines = append(tmpInfolines, infoLine...)
 		}
+		args := sliceStr2Dict(tmpInfolines)
+		slaveMapping[key] =
+			strings.Join(
+				strings.Split(fieldSplicing(args, "ip", "port"), ","),
+				":",
+			)
 	}
 	return slaveMapping, nil
 }

@@ -218,7 +218,7 @@ func (s *RedisClusterTop) repeatPeek() {
 	}()
 }
 
-func (s *RedisClusterTop) ReceiveNodeInfos() (active <-chan []*NodeInfo, dead <-chan []*NodeInfo) {
+func (s *RedisClusterTop) ReceiveNodeInfos() (add <-chan []*NodeInfo, del <-chan []*NodeInfo) {
 	additionNodes := make(chan []*NodeInfo)
 	deleteNodes := make(chan []*NodeInfo)
 
