@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -13,13 +14,34 @@ var (
 	ErrCommand      = `(error) ERR wrong number of arguments for '%s' command`
 	Nil             = `(nil)`
 	Ok              = `OK`
-	ClusterNodeInfo = `cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922
-c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460
-885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383
-656042ad560b887164138a19dab2502154f8b039 10.1.1.228:7004@17004 slave c6d165b72cfcd76d7662e559dc709e00e3dabf03 0 1562154205381 25 connected
-a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected
-62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected`
+	ClusterNodeInfo []byte
 )
+
+func init() {
+
+	bbf := bytes.NewBuffer(nil)
+	bbf.WriteString(`cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922`)
+	bbf.WriteByte('\n')
+	bbf.WriteString(`c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460`)
+	bbf.WriteByte('\n')
+	bbf.WriteString(`885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383`)
+	bbf.WriteByte('\n')
+	bbf.WriteString(`656042ad560b887164138a19dab2502154f8b039 10.1.1.228:7004@17004 slave c6d165b72cfcd76d7662e559dc709e00e3dabf03 0 1562154205381 25 connected`)
+	bbf.WriteByte('\n')
+	bbf.WriteString(`a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected`)
+	bbf.WriteByte('\n')
+	bbf.WriteString(`62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected`)
+	bbf.WriteByte('\n')
+
+	ClusterNodeInfo = bbf.Bytes()
+	// 	 `cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922
+	// c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460
+	// 885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383
+	// 656042ad560b887164138a19dab2502154f8b039 10.1.1.228:7004@17004 slave c6d165b72cfcd76d7662e559dc709e00e3dabf03 0 1562154205381 25 connected
+	// a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected
+	// 62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected`
+
+}
 
 var storage map[string]string = make(map[string]string)
 
@@ -109,7 +131,7 @@ func handerRequest(rWriter *RespWriter, req [][]byte) error {
 		return rWriter.FlushString(Ok)
 
 	case "cluster":
-		return rWriter.FlushString(ClusterNodeInfo)
+		return rWriter.FlushBulk(ClusterNodeInfo)
 
 	default:
 		err = rWriter.FlushString("not support command")
@@ -165,7 +187,7 @@ func TestClientToCluster(t *testing.T) {
 	t.Run("cluster", func(t *testing.T) {
 		if reply, err := String(cli.Do("cluster", "nodes")); err != nil {
 			t.Fatal(err)
-		} else if reply != ClusterNodeInfo {
+		} else if reply != string(ClusterNodeInfo) {
 			t.Fatalf("Expected value does not match: %s", reply)
 		}
 	})
