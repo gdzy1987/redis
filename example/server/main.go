@@ -11,10 +11,9 @@ import (
 )
 
 var (
-	ErrCommand      = `(error) ERR wrong number of arguments for '%s' command`
-	Nil             = `(nil)`
-	Ok              = `OK`
-	ClusterNodeInfo = []byte("cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922^nc6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460^n885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383^n656042ad560b887164138a19dab2502154f8b039 10.1.1.228:7004@17004 slave c6d165b72cfcd76d7662e559dc709e00e3dabf03 0 1562154205381 25 connected^na70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected^n62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected^n")
+	ErrCommand = "(error) ERR wrong number of arguments for '%s' command"
+	Nil        = "(nil)"
+	Ok         = "OK"
 
 	SentinelNodeInfo = []interface{}{
 		[]byte("name"),
@@ -58,7 +57,15 @@ var (
 		[]byte("parallel-syncs"),
 		[]byte("1"),
 	}
+
+	otherClusterNodeInfo = `cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922
+c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460
+885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383
+656042ad560b887164138a19dab2502154f8b039 10.1.1.228:7004@17004 slave c6d165b72cfcd76d7662e559dc709e00e3dabf03 0 1562154205381 25 connected
+a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected
+62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected`
 )
+
 var storage map[string]string = make(map[string]string)
 
 func asyncServe(addr string) func() {
@@ -145,7 +152,7 @@ func handerRequest(rWriter *redis.RespWriter, req [][]byte) error {
 		storage[key] = value
 		return rWriter.FlushString(Ok)
 	case "cluster":
-		return rWriter.FlushBulk([]byte(ClusterNodeInfo))
+		return rWriter.FlushString(string(otherClusterNodeInfo))
 	case "sentinel":
 		return rWriter.FlushArray(SentinelNodeInfo)
 	default:

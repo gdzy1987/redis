@@ -10,7 +10,7 @@ import (
 
 func main() {
 	log.SetOutput(os.Stdout)
-	cluster := topology.CreateRedisClusterTopFromAddrs("10.1.1.228:7001", "10.1.1.228:7002")
+	cluster := topology.CreateRedisClusterTopFromAddrs("10.1.1.228:7001", "10.1.1.228:7002", "10.1.1.228:7003", "10.1.1.228:7004", "10.1.1.228:7005", "10.1.1.228:7006")
 
 	stop := cluster.Run()
 	defer stop()

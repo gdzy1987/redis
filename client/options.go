@@ -37,6 +37,12 @@ func NewOption() *Options {
 	}
 }
 
+func DialMaxIdelConns(i int) DialOption {
+	return DialOption{func(do *Options) {
+		do.maxIdleConns = i
+	}}
+}
+
 // DialReadTimeout specifies the timeout for reading a single command reply.
 func DialReadTimeout(d time.Duration) DialOption {
 	return DialOption{func(do *Options) {
