@@ -122,7 +122,7 @@ func (resp *RespReader) ParseBulkTo(w io.Writer) error {
 		return err
 	}
 	if len(line) == 0 {
-		return errors.New("ledis: short response line")
+		return errors.New("redis: short response line")
 	}
 
 	switch line[0] {
