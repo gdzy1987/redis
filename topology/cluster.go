@@ -193,7 +193,7 @@ func (s *RedisClusterTop) peek(ctx context.Context) error {
 
 func (s *RedisClusterTop) repeatPeek() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 
 		for {
@@ -204,7 +204,7 @@ func (s *RedisClusterTop) repeatPeek() {
 			}
 
 			bgctx := context.Background()
-			ctx, cancel := context.WithTimeout(bgctx, time.Second*5)
+			ctx, cancel := context.WithTimeout(bgctx, time.Second*1)
 			defer cancel()
 			switch s.peek(ctx) {
 			case ErrTopChanged:

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -9,30 +10,43 @@ import (
 	"sync"
 )
 
-var storage map[string]string = make(map[string]string)
+type DataStorage interface {
+	Set([]byte, []byte) error
+	Get([]byte) ([]byte, error)
+	Hset([]byte, []byte, []byte) error
+	Hget([]byte, []byte) ([]byte, error)
 
-type handlesFunc = func(rWriter *RespWriter, req [][]byte) error
-
-type VirtualServer struct {
-	mu      sync.Mutex
-	handles map[string]handlesFunc
+	Cluster() ([]byte, error)
+	Sentinel() ([]interface{}, error)
 }
 
-func NewVirtualServer() *VirtualServer {
+type HandlesFunc = func(rWriter *RespWriter, req [][]byte) error
+
+type VirtualServer struct {
+	mu sync.Mutex
+
+	stge    DataStorage
+	addr    string
+	handles map[string]HandlesFunc
+}
+
+func NewVirtualServer(stge DataStorage) *VirtualServer {
 	return &VirtualServer{
-		mu:      sync.Mutex{},
-		handles: make(map[string]handlesFunc),
+		mu:   sync.Mutex{},
+		stge: stge,
+
+		handles: make(map[string]HandlesFunc),
 	}
 }
 
-func (v *VirtualServer) AddHandles(name string, h handlesFunc) {
+func (v *VirtualServer) AddHandles(name string, h HandlesFunc) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.handles[name] = h
 }
 
-func (v *VirtualServer) Serve() (cancel func(), port string) {
-	listener, err := net.Listen("tcp", "localhost:0")
+func (v *VirtualServer) Serve(addr string) (cancel func(), port string) {
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return func() { panic(err) }, ""
 	}
@@ -71,11 +85,10 @@ func (v *VirtualServer) serverHandler(conn net.Conn) {
 	req, err := rReader.ParseRequest()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v", err)
+		return
 	}
-	fmt.Fprintf(os.Stdout, "parse request %s\n", req)
 
 	v.handerRequest(rWriter, req)
-
 }
 
 func (v *VirtualServer) handerRequest(rWriter *RespWriter, req [][]byte) error {
@@ -84,6 +97,10 @@ func (v *VirtualServer) handerRequest(rWriter *RespWriter, req [][]byte) error {
 		cmd = ""
 	} else {
 		cmd = strings.ToLower(string(req[0]))
+	}
+	_, exist := v.handles[cmd]
+	if !exist {
+		return errors.New("undefine handles")
 	}
 	return v.handles[cmd](rWriter, req)
 }
