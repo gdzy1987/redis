@@ -15,18 +15,18 @@ import (
 	c "github.com/dengzitong/redis/client"
 )
 
-type SelectionType string
+type sectionType string
 
 const (
-	Server      SelectionType = "Server"
-	Clients     SelectionType = "Clients"
-	Memory      SelectionType = "Memory"
-	Persistence SelectionType = "Persistence"
-	Stats       SelectionType = "Stats"
-	Replication SelectionType = "Replication"
-	CPU         SelectionType = "CPU"
-	Cluster     SelectionType = "Cluster"
-	Keyspace    SelectionType = "Keyspace"
+	Server      sectionType = "Server"
+	Clients     sectionType = "Clients"
+	Memory      sectionType = "Memory"
+	Persistence sectionType = "Persistence"
+	Stats       sectionType = "Stats"
+	Replication sectionType = "Replication"
+	CPU         sectionType = "CPU"
+	Cluster     sectionType = "Cluster"
+	Keyspace    sectionType = "Keyspace"
 )
 
 //exec another process
@@ -152,7 +152,7 @@ func (i *masterInfo) String() string {
 
 // Find the current topology based on the command
 // And return the cropping information of the current topology
-func ProbeTopology(mode Mode, addrs ...string) ([]string, error) {
+func ProbeTopology(pwd string, mode Mode, addrs ...string) ([]string, error) {
 	var redisClient *c.Client
 
 	if reached, err := Ping(addrs...); err != nil {
@@ -160,7 +160,11 @@ func ProbeTopology(mode Mode, addrs ...string) ([]string, error) {
 	} else if len(reached) < 1 {
 		return nil, errors.New("all addresses are unreachable")
 	} else {
-		redisClient = c.NewClient(reached[0])
+		if len(pwd) > 0 {
+			redisClient = c.NewClient(reached[0], c.DialPassword(pwd))
+		} else {
+			redisClient = c.NewClient(reached[0])
+		}
 	}
 	var info interface{}
 
@@ -180,16 +184,16 @@ func ProbeTopology(mode Mode, addrs ...string) ([]string, error) {
 	case SingleMode:
 		info = addrs[0]
 	}
-	return ParsedByInfo(mode, info)
+	return ParseByInfo(mode, info)
 }
 
-func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
+func ParseByInfo(m Mode, info interface{}) ([]string, error) {
 	var res []string
 	switch m {
 	case ClusterMode:
 		line, ok := info.(string)
 		if !ok {
-			return nil, errors.New("the info that needs to be parsed is not the type string is needed")
+			return nil, errors.New("the info that needs to be Parse is not the type string is needed")
 		}
 		/*
 			# this 3 master and  3 slave cluster model info
@@ -205,7 +209,7 @@ func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
 		ss := strings.Split(line, "\n")
 		length := len(ss) - 1
 		if length < 1 {
-			return nil, errors.New("parsed cmd result empty")
+			return nil, errors.New("Parse cmd result empty")
 		}
 		res = make([]string, 0)
 		for i := 0; i < length; i++ {
@@ -220,7 +224,7 @@ func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
 			}
 			infoSS := strings.Split(infoStr, " ")
 			if len(infoSS) < 4 {
-				return nil, errors.New("parsed cluster mode line info error")
+				return nil, errors.New("Parse cluster mode line info error")
 			}
 
 			tmpIp := infoSS[1]
@@ -235,7 +239,7 @@ func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
 	case SentinelMode:
 		masterSS, ok := info.([]string)
 		if !ok {
-			return nil, errors.New("the info that needs to be parsed is not the type []string is needed")
+			return nil, errors.New("the info that needs to be Parse is not the type []string is needed")
 		}
 		/*
 			# this 1 master sentinel model
@@ -267,7 +271,7 @@ func ParsedByInfo(m Mode, info interface{}) ([]string, error) {
 	case SingleMode:
 		addr, ok := info.(string)
 		if !ok {
-			return nil, errors.New("the info that needs to be parsed is not the type []string is needed")
+			return nil, errors.New("the info that needs to be Parse is not the type []string is needed")
 		}
 		res = []string{addr}
 	}
@@ -297,7 +301,7 @@ func fieldSplicing(m map[string]string, cols ...string) string {
 	return strings.Join(ss, ",")
 }
 
-func ProbeNode(addr string, pwd string) (map[SelectionType]map[string]string, error) {
+func ProbeNode(addr string, pwd string) (map[sectionType]map[string]string, error) {
 	var redisClient *c.Client
 	if len(pwd) < 1 {
 		redisClient = c.NewClient(addr)
@@ -308,12 +312,12 @@ func ProbeNode(addr string, pwd string) (map[SelectionType]map[string]string, er
 	if err != nil {
 		return nil, err
 	}
-	return ParsedNodeInfo(line), nil
+	return ParseNodeInfo(line), nil
 }
 
-// parsedNodeInfo parse the bulk string returned by the redis info command
-func ParsedNodeInfo(line string) map[SelectionType]map[string]string {
-	redisInfo := make(map[SelectionType]map[string]string)
+// ParseNodeInfo parse the bulk string returned by the redis info command
+func ParseNodeInfo(line string) map[sectionType]map[string]string {
+	redisInfo := make(map[sectionType]map[string]string)
 	strList := strings.Split(line, "\n")
 	selection := ""
 	for i, _ := range strList {
@@ -323,17 +327,17 @@ func ParsedNodeInfo(line string) map[SelectionType]map[string]string {
 		}
 		if strings.HasPrefix(line, "#") {
 			selection = strings.TrimSpace(line[1:])
-			redisInfo[SelectionType(selection)] = make(map[string]string)
+			redisInfo[sectionType(selection)] = make(map[string]string)
 			continue
 		}
 		contentList := strings.Split(line, ":")
-		redisInfo[SelectionType(selection)][contentList[0]] = contentList[1]
+		redisInfo[sectionType(selection)][contentList[0]] = contentList[1]
 	}
 	return redisInfo
 }
 
 // parsing information about the replication selection
-func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
+func ParseReplicationInfo(m map[string]string) map[string]string {
 	/*
 		role:master
 		connected_slaves:1
@@ -344,7 +348,7 @@ func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
 		...
 	*/
 	if len(m) < 1 {
-		return nil, errors.New("selection replication empty")
+		return nil
 	}
 	slaveReg, _ := regexp.Compile("^slave([0-9]*)")
 	slaveMapping := make(map[string]string)
@@ -356,10 +360,10 @@ func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
 		}
 		infoss := strings.Split(value, ",")
 		if len(infoss) < 2 {
-			return nil, errors.New("parsed slave node error")
+			return nil
 		}
 		for _, info := range infoss {
-			// ip=10.1.1.228
+			// ip=10.1.1.228,...
 			infoLine := strings.Split(info, "=")
 			tmpInfolines = append(tmpInfolines, infoLine...)
 		}
@@ -370,11 +374,11 @@ func ParsedReplicationInfo(m map[string]string) (map[string]string, error) {
 				":",
 			)
 	}
-	return slaveMapping, nil
+	return slaveMapping
 }
 
-// ParsedSlaveInfo call the probeNodeInfo function to implement the NodeInfo initialization parameters
-func ParsedSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
+// ParseSlaveInfo call the probeNodeInfo function to implement the NodeInfo initialization parameters
+func ParseSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
 	/*
 		map[string]string{"slave0":"10.1.1.228:7004"}
 	*/
@@ -398,12 +402,9 @@ func ParsedSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
 			return nil, errors.New("selection Server.run_id not exist")
 		}
 
-		nio := &NodeInfo{
-			Version: version,
-			RunID:   runid,
-			IpAddr:  v,
-		}
-		res = append(res, nio)
+		res = append(res, &NodeInfo{
+			Ver: version, Id: runid, Addr: v,
+		})
 	}
 	return res, nil
 }

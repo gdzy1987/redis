@@ -1,0 +1,56 @@
+version: '3'
+
+services:
+ redis1:
+  build: ./
+  restart: always
+  environment:
+   - REDIS_PORT=8001
+  ports:
+    - '8001:8001'       #服务端口
+    - '18001:18001'   #集群端口
+
+ redis2:
+  build: ./
+  restart: always
+  environment:
+   - REDIS_PORT=8002
+  ports:
+    - '8002:8002'
+    - '18002:18002'
+
+ redis3:
+  build: ./
+  restart: always
+  environment:
+   - REDIS_PORT=8003
+  ports:
+    - '8003:8003'
+    - '18003:18003'
+
+ redis4:
+  build: ./
+  restart: always
+  environment:
+   - REDIS_PORT=8004
+  ports:
+    - '8004:8004'
+    - '18004:18004'
+
+ redis5:
+  build: ./
+  restart: always
+  environment:
+   - REDIS_PORT=8005
+  ports:
+    - '8005:8005'
+    - '18005:18005'
+
+ redis6:
+  build: ./
+  restart: always
+  environment:
+   - REDIS_PORT=8006
+  ports:
+    - '8006:8006'
+    - '18006:18006'

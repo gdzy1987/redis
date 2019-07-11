@@ -3,6 +3,7 @@ package topology
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ func newNodeGroup() *nodeGroup {
 func (g *nodeGroup) put(node *NodeInfo) {
 	g.l.Lock()
 	defer g.l.Unlock()
-	g.m[node.RunID] = node
+	g.m[node.Id] = node
 }
 
 func (g *nodeGroup) diff(ng *nodeGroup) (increased []*NodeInfo, decreasd []*NodeInfo, hasdiff bool) {
@@ -55,8 +56,9 @@ func (g *nodeGroup) diff(ng *nodeGroup) (increased []*NodeInfo, decreasd []*Node
 }
 
 type RedisClusterTop struct {
-	Addrs         []string             `json:"addrs"`
-	TopologyGroup map[string]*Topology `json:"group"`
+	Addrs  []string             `json:"addrs"`
+	Pass   string               `json:"pass"`
+	TGroup map[string]*Topology `json:"group"`
 
 	incrNodeInfos []*NodeInfo
 	decrNodeInfos []*NodeInfo
@@ -70,11 +72,20 @@ type RedisClusterTop struct {
 	initialized bool
 }
 
-func CreateRedisClusterTopFromAddrs(addrs ...string) *RedisClusterTop {
-	r := &RedisClusterTop{
-		one: sync.Once{},
+func (s *RedisClusterTop) Format() string {
+	p, err := json.Marshal(s.TGroup)
+	if err != nil {
+		panic(err)
 	}
-	r.TopologyGroup = make(map[string]*Topology)
+	return string(p)
+}
+
+func CreateRedisClusterTopFromAddrs(pwd string, addrs ...string) *RedisClusterTop {
+	r := &RedisClusterTop{
+		Pass: pwd,
+		one:  sync.Once{},
+	}
+	r.TGroup = make(map[string]*Topology)
 	r.Addrs = addrs
 	r.changed = make(chan struct{})
 
@@ -105,24 +116,18 @@ func (s *RedisClusterTop) updateIncr(incrs []*NodeInfo) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.incrNodeInfos = incrs
-	for i, _ := range incrs {
-		node := incrs[i]
-		t, ok := s.query(node.RunID)
-		if !ok {
-			nt := &Topology{
-				Fingerprint: node.RunID,
-				Mode:        ClusterMode,
-				Master:      node,
-				Slaves:      make([]*NodeInfo, 0),
-				Offset:      -1,
-			}
-			nt.CollectSlaves()
-			s.TopologyGroup[nt.Fingerprint] = nt
+	for index := range incrs {
+		node := incrs[index]
+		t, ok := s.query(node)
+		if ok {
+			t.cancel()
+			t.Master = node
+			t.collect()
 			continue
 		}
-		t.ResetMaster(node)
-		t.CollectSlaves()
-		s.TopologyGroup[t.Fingerprint] = t
+		srcT := s.TGroup[t.Fingerprint]
+		srcT = t
+		srcT.alwaysCollect()
 	}
 }
 
@@ -130,23 +135,32 @@ func (s *RedisClusterTop) updateDecr(decr []*NodeInfo) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.decrNodeInfos = decr
-	for i, _ := range decr {
-		node := decr[i]
-		t, ok := s.query(node.RunID)
+	for index := range decr {
+		node := decr[index]
+		t, ok := s.query(node)
 		if !ok {
 			continue
 		}
-		delete(s.TopologyGroup, t.Fingerprint)
+		delete(s.TGroup, t.Fingerprint)
 	}
 }
 
-func (s *RedisClusterTop) query(fp string) (*Topology, bool) {
-	for ffp, topology := range s.TopologyGroup {
-		if fpComparison(ffp, fp) {
+func (s *RedisClusterTop) query(node *NodeInfo) (*Topology, bool) {
+	for ffp, topology := range s.TGroup {
+		if fpComparison(ffp, node.Id) {
 			return topology, true
 		}
 	}
-	return &Topology{}, false
+	t := &Topology{
+		Fingerprint: node.Id,
+		Mode:        ClusterMode,
+		Master:      node,
+		Password:    s.Pass,
+		Slaves:      make([]*NodeInfo, 0),
+		Offset:      -1,
+	}
+	t.collect()
+	return t, false
 }
 
 func (s *RedisClusterTop) peek(ctx context.Context) error {
@@ -154,24 +168,26 @@ func (s *RedisClusterTop) peek(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		topInfos, err := ProbeTopology(ClusterMode, s.Addrs...)
+		topInfos, err := ProbeTopology(s.Pass, ClusterMode, s.Addrs...)
 		if err != nil {
 			return err
 		}
 
+		log.Printf("topinfo: %#v\n", topInfos)
+
 		nng := newNodeGroup()
-		for i, _ := range topInfos {
+		for i := range topInfos {
 			info := topInfos[i]
 			ss := strings.Split(info, ",")
 			if len(ss) < 2 {
 				return ErrProbe
 			}
-			nng.put(&NodeInfo{RunID: ss[0], IpAddr: ss[1]})
+			nng.put(&NodeInfo{Id: ss[0], Addr: ss[1]})
 		}
 
 		update := func(s *RedisClusterTop, nng *nodeGroup) error {
 			sndg := newNodeGroup()
-			for _, t := range s.TopologyGroup {
+			for _, t := range s.TGroup {
 				sndg.put(t.Master)
 			}
 			incrs, decrs, hasdiff := sndg.diff(nng)

@@ -26,6 +26,9 @@ type Options struct {
 	tlsConfig *tls.Config
 }
 
+func (o *Options) SetMaxIdelConns(i int) { o.maxIdleConns = i }
+func (o *Options) SetPassword(s string)  { o.password = s }
+
 func NewOption() *Options {
 	return &Options{
 		maxIdleConns:    4,
