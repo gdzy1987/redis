@@ -24,8 +24,7 @@ type NodeInfo struct {
 	Offset int64  `json:"node_offset"`
 
 	IsMaster bool `json:"is_master"`
-
-	changed chan *NodeInfo
+	changed  chan *NodeInfo
 
 	c *client.Client
 }

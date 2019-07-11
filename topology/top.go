@@ -114,7 +114,7 @@ type (
 	}
 )
 
-type TopologyHandler interface {
+type Topologyer interface {
 	// Topology service is ready served
 	// When used, it needs to return true if the service is fully operational, otherwise it will block
 	// When the topology of the backend changes
@@ -128,7 +128,7 @@ type TopologyHandler interface {
 	Basic
 }
 
-func NewTopologyHandler(mode Mode, addrs ...string) (t TopologyHandler, err error) {
+func NewTopologyer(mode Mode, addrs ...string) (t Topologyer, err error) {
 	switch mode {
 	case ClusterMode:
 
@@ -139,8 +139,8 @@ func NewTopologyHandler(mode Mode, addrs ...string) (t TopologyHandler, err erro
 	return nil, nil
 }
 
-func UnmarshalFromBytes(mode Mode, p []byte) (TopologyHandler, error) {
-	var th TopologyHandler
+func UnmarshalFromBytes(mode Mode, p []byte) (Topologyer, error) {
+	var th Topologyer
 	switch mode {
 	case SingleMode:
 

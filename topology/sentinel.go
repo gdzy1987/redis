@@ -1,15 +1,11 @@
 package topology
 
-import "net"
-
-type RedisSentinelTop struct {
-	TopologyGroup []*Topology `json:"topology_group"`
-	Addrs         []string    `json:"addrs"`
-	GlobalOffset  int64       `json:"offset"`
+type RedisSentinel struct {
+	*RedisSingle
 }
 
-func createRedisSentinelTop() *RedisSentinelTop {
-	return &RedisSentinelTop{}
+func CreateRedisSentinel(pass string, addrs ...string) *RedisSentinel {
+	single := CreateRedisSingle(pass, addrs...)
+	return &RedisSentinel{single}
 }
-func (s *RedisSentinelTop) IsActivity() bool             { return false }
-func (s *RedisSentinelTop) OnConns() ([]net.Conn, error) { return nil, nil }
+
