@@ -1,14 +1,10 @@
 package topology
 
 import (
-	"errors"
+	"encoding/json"
 	"strings"
 	"sync/atomic"
-)
-
-var (
-	ErrProbe      = errors.New("probe error")
-	ErrTopChanged = errors.New("top changed")
+	"time"
 )
 
 type Mode int
@@ -22,30 +18,19 @@ const (
 	SlaveStr  = `slave`
 )
 
-func fpComparison(s, t string) bool { return strings.Contains(t, s) }
-
-type NodeInfo struct {
-	Version string `json:"node_version"`
-	RunID   string `json:"node_runid"`
-	IpAddr  string `json:"node_addr"`
-}
-
 type Topology struct {
 	Mode        `json:"mode"`
 	Fingerprint string      `json:"top_fingerprint"`
 	Master      *NodeInfo   `json:"top_master"`
 	Slaves      []*NodeInfo `json:"top_slaves"`
 	Offset      int64       `json:"top_offset"`
-}
+	Password    string      `josn:"top_password"`
 
-// replace Master node
-func (t *Topology) ResetMaster(n *NodeInfo) {
-	t.Fingerprint = n.RunID
-	t.Master = n
+	cancel func()
 }
 
 // cluster mode data node
-func (t *Topology) CollectSlaves() {
+func (t *Topology) collect() {
 	if t.Slaves == nil {
 		t.Slaves = make([]*NodeInfo, 0)
 	}
@@ -53,25 +38,42 @@ func (t *Topology) CollectSlaves() {
 	t.Slaves = t.Slaves[:0]
 
 	// this is a serious mistake
-	ms, err := ProbeNode(t.Master.IpAddr, "")
+	ms, err := ProbeNode(t.Master.Addr, t.Password)
 	if err != nil {
 		panic(err)
 	}
+
+	serverInfoMap, exist := ms[Server]
+	if !exist {
+		panic("probe node info server selection not exist")
+	}
+
+	_, exist = serverInfoMap["redis_version"]
+	if !exist {
+		panic("probe node info server.redis_version not exist")
+	}
+
+	t.Master.Ver = serverInfoMap["redis_version"]
+
 	replicationInfoMap, exits := ms[Replication]
 	if !exits {
-		panic("probe node info not exists replication selection")
+		panic("probe node info replication selection not exist ")
 	}
-	slaveMap, err := ParsedReplicationInfo(replicationInfoMap)
+
+	slaveMap := ParseReplicationInfo(replicationInfoMap)
+	if slaveMap == nil {
+		return
+	}
+
+	nodeInfos, err := ParseSlaveInfo(slaveMap, "")
 	if err != nil {
 		panic(err)
 	}
-	nodeInfos, err := ParsedSlaveInfo(slaveMap, "")
-	if err != nil {
-		panic(err)
-	}
+
 	for _, n := range nodeInfos {
-		t.fingerprintCorrection(n.RunID)
+		t.fingerprintCorrection(n.Id)
 	}
+
 	t.Slaves = nodeInfos
 }
 
@@ -85,8 +87,22 @@ func (t *Topology) fingerprintCorrection(s string) {
 	)
 }
 
-func (t *Topology) UpdateOffset(i int64) {
-	atomic.AddInt64(&t.Offset, i)
+func (t *Topology) UpdateOffset(i int64) { atomic.AddInt64(&t.Offset, i) }
+
+func (t *Topology) alwaysCollect() {
+	cancelSignal := make(chan struct{})
+	go func() {
+		tk := time.NewTicker(1 * time.Second)
+		for {
+			select {
+			case <-tk.C:
+				t.collect()
+			case <-cancelSignal:
+				return
+			}
+		}
+	}()
+	t.cancel = func() { cancelSignal <- struct{}{} }
 }
 
 type (
@@ -98,7 +114,7 @@ type (
 	}
 )
 
-type TopologyHandler interface {
+type Topologyer interface {
 	// Topology service is ready served
 	// When used, it needs to return true if the service is fully operational, otherwise it will block
 	// When the topology of the backend changes
@@ -112,11 +128,29 @@ type TopologyHandler interface {
 	Basic
 }
 
-func NewTopologyHandler(mode Mode, addrs ...string) (t TopologyHandler, err error) {
+func NewTopologyer(mode Mode, addrs ...string) (t Topologyer, err error) {
 	switch mode {
 	case ClusterMode:
+
 	case SentinelMode:
+
 	case SingleMode:
 	}
 	return nil, nil
+}
+
+func UnmarshalFromBytes(mode Mode, p []byte) (Topologyer, error) {
+	var th Topologyer
+	switch mode {
+	case SingleMode:
+
+	case ClusterMode:
+
+	case SentinelMode:
+	}
+	err := json.Unmarshal(p, th)
+	if err != nil {
+		return nil, err
+	}
+	return th, nil
 }

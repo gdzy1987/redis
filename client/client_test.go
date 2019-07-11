@@ -49,6 +49,10 @@ func (m *mm) Sentinel() ([]interface{}, error) {
 	return SentinelNodeInfo, nil
 }
 
+func (m *mm) Info() ([]byte, error) {
+	return nil, nil
+}
+
 var (
 	ErrCommand           = `(error) ERR wrong number of arguments for '%s' command`
 	Nil                  = `(nil)`
@@ -145,7 +149,7 @@ func TestClientSet(t *testing.T) {
 	defer cancel()
 
 	virtualServer.AddHandles("set", func(rw *RespWriter, req [][]byte) error {
-		virtualServer.stge.Set(req[1], req[2])
+		virtualServer.Set(req[1], req[2])
 		return rw.FlushString(Ok)
 	})
 
@@ -174,7 +178,7 @@ func TestClientToCluster(t *testing.T) {
 	defer cancel()
 
 	virtualServer.AddHandles("cluster", func(rw *RespWriter, req [][]byte) error {
-		b, err := virtualServer.stge.Cluster()
+		b, err := virtualServer.Cluster()
 		if err != nil {
 			return err
 		}
@@ -200,7 +204,7 @@ func TestClientToSentinel(t *testing.T) {
 	defer cancel()
 
 	virtualServer.AddHandles("sentinel", func(rw *RespWriter, req [][]byte) error {
-		b, err := virtualServer.stge.Sentinel()
+		b, err := virtualServer.Sentinel()
 		if err != nil {
 			return err
 		}

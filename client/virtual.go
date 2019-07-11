@@ -18,22 +18,23 @@ type DataStorage interface {
 
 	Cluster() ([]byte, error)
 	Sentinel() ([]interface{}, error)
+	Info() ([]byte, error)
 }
 
 type HandlesFunc = func(rWriter *RespWriter, req [][]byte) error
 
 type VirtualServer struct {
-	mu sync.Mutex
+	DataStorage
 
-	stge    DataStorage
+	mu      sync.Mutex
 	addr    string
 	handles map[string]HandlesFunc
 }
 
 func NewVirtualServer(stge DataStorage) *VirtualServer {
 	return &VirtualServer{
-		mu:   sync.Mutex{},
-		stge: stge,
+		mu:          sync.Mutex{},
+		DataStorage: stge,
 
 		handles: make(map[string]HandlesFunc),
 	}
