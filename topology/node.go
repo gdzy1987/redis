@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dengzitong/redis/client"
 )
@@ -27,23 +26,18 @@ type NodeInfo struct {
 	IsMaster bool `json:"is_master"`
 
 	changed chan *NodeInfo
-	stopped chan *NodeInfo
 
 	c *client.Client
 }
 
 func CreateNodeInfo(addr string, pass string) *NodeInfo {
 	return &NodeInfo{
-		Addr: addr, Pass: pass,
-		stopped: make(chan *NodeInfo),
+		Addr: addr,
+		Pass: pass,
 	}
 }
 
-func (n *NodeInfo) Stop() {
-	go func() {
-		n.stopped <- n
-	}()
-}
+func (n *NodeInfo) Stop() { n.c.Close() }
 
 func (n *NodeInfo) prepare() {
 	dialops := []client.DialOption{
@@ -99,26 +93,6 @@ func (n *NodeInfo) collect() {
 	n.IsMaster = (ismaster == MasterStr)
 }
 
-func (n *NodeInfo) Survery() {
-	n.prepare()
-	ticker := time.NewTicker(1 * time.Second)
-	go func() {
-		defer func() {
-			ticker.Stop()
-			n.c.Close()
-		}()
-		for {
-			select {
-			case <-n.stopped:
-				return
-			default:
-			}
-			n.collect()
-			<-ticker.C
-		}
-	}()
-}
-
 type NodeInfos struct {
 	UUID    string      `json:"uuid"`
 	Members []*NodeInfo `json:"nodes"` // index:0 is master node
@@ -129,7 +103,7 @@ type NodeInfos struct {
 	changeds []chan *NodeInfo
 }
 
-func NewNodeInfos() *NodeInfos {
+func CreateNodeInfos() *NodeInfos {
 	return &NodeInfos{
 		UUID:     NewSUID().String(),
 		Members:  make([]*NodeInfo, 0),
@@ -154,9 +128,20 @@ func (ns *NodeInfos) Swap(i, j int) {
 }
 
 func (ns *NodeInfos) Master() *NodeInfo {
-	if len(ns.Members) < 1 {
-		return nil
+	if !ns.hasMaster() {
+		for _, member := range ns.Members {
+			member.collect()
+		}
 	}
 	sort.Sort(ns)
 	return ns.Members[0]
+}
+
+func (ns *NodeInfos) hasMaster() bool {
+	for _, member := range ns.Members {
+		if member.IsMaster {
+			return true
+		}
+	}
+	return false
 }

@@ -95,8 +95,8 @@ func TestNodeInfosSort(t *testing.T) {
 
 }
 
-func TestNodeInfos(t *testing.T) {
-	node1 := `# Server
+var (
+	node1 = `# Server
 redis_version:4.0.2
 redis_git_sha1:00000000
 redis_git_dirty:0
@@ -130,7 +130,7 @@ repl_backlog_size:268435456
 repl_backlog_first_byte_offset:3490565209
 repl_backlog_histlen:268435456`
 
-	node2 := `# Server
+	node2 = `# Server
 redis_version:4.0.2
 redis_git_sha1:00000000
 redis_git_dirty:0
@@ -164,7 +164,7 @@ repl_backlog_size:268435456
 repl_backlog_first_byte_offset:3490565209
 repl_backlog_histlen:268435456`
 
-	node3 := `# Server
+	node3 = `# Server
 redis_version:4.0.2
 redis_git_sha1:00000000
 redis_git_dirty:0
@@ -197,35 +197,43 @@ repl_backlog_active:1
 repl_backlog_size:268435456
 repl_backlog_first_byte_offset:3490565209
 repl_backlog_histlen:268435456`
+)
 
+func threeNode() ([]string, func()) {
 	s1 := client.NewVirtualServer(nil)
 	s1.AddHandles("info", func(rw *client.RespWriter, req [][]byte) error {
 		return rw.FlushBulk([]byte(node1))
 	})
-	cancel, s1addr := s1.Serve("localhost:0")
-	defer cancel()
+	cancel1, s1addr := s1.Serve("localhost:0")
 
 	s2 := client.NewVirtualServer(nil)
 	s2.AddHandles("info", func(rw *client.RespWriter, req [][]byte) error {
 		return rw.FlushBulk([]byte(node2))
 	})
-	cancel, s2addr := s2.Serve("localhost:0")
-	defer cancel()
+	cancel2, s2addr := s2.Serve("localhost:0")
 
 	s3 := client.NewVirtualServer(nil)
 	s3.AddHandles("info", func(rw *client.RespWriter, req [][]byte) error {
 		return rw.FlushBulk([]byte(node3))
 	})
-	cancel, s3addr := s3.Serve("localhost:0")
-	defer cancel()
+	cancel3, s3addr := s3.Serve("localhost:0")
 
-	addrs := []string{
-		s1addr,
-		s2addr,
-		s3addr,
+	return []string{s1addr, s2addr, s3addr}, func() {
+		defer func() {
+			for _, cancel := range []func(){cancel1, cancel2, cancel3} {
+				cancel()
+			}
+		}()
 	}
 
-	nodes := NewNodeInfos()
+}
+
+func TestNodeInfos(t *testing.T) {
+
+	addrs, cancels := threeNode()
+	defer cancels()
+
+	nodes := CreateNodeInfos()
 	for _, addr := range addrs {
 		node := CreateNodeInfo(addr, "")
 		node.prepare()
