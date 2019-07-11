@@ -1,16 +1,10 @@
 package topology
 
-import "net"
-
-type RedisSingleTop struct {
-	TopologyGroup []*Topology `json:"topology_group"`
-	Addrs         []string    `json:"addrs"`
-	GlobalOffset  int64       `json:"offset"`
+// redis single or master->slave architectural model
+type RedisSingle struct {
+	*NodeInfos `json:"nodes"`
 }
 
-func createRedisSingleTop() *RedisSingleTop {
-	return &RedisSingleTop{}
+func CreateRedisSingle() *RedisSingle {
+	return &RedisSingle{}
 }
-
-func (s *RedisSingleTop) IsActivity() bool             { return false }
-func (s *RedisSingleTop) OnConns() ([]net.Conn, error) { return nil, nil }

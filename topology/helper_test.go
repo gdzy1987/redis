@@ -235,23 +235,23 @@ a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbd
 	}
 )
 
-func TestProbeTopParsedByInfo(t *testing.T) {
+func TestProbeTopParseByInfo(t *testing.T) {
 
-	clusterAddrs, err := ParsedByInfo(ClusterMode, otherClusterNodeInfo)
+	clusterAddrs, err := ParseByInfo(ClusterMode, otherClusterNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(clusterAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	sentinelAddrs, err := ParsedByInfo(SentinelMode, SentinelNodeInfo)
+	sentinelAddrs, err := ParseByInfo(SentinelMode, SentinelNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(sentinelAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	singleAddrs, err := ParsedByInfo(SingleMode, "localhost:1234")
+	singleAddrs, err := ParseByInfo(SingleMode, "localhost:1234")
 	if err != nil {
 		t.Fatal(err)
 	} else if len(singleAddrs) < 1 {
@@ -275,11 +275,11 @@ func TestProbeFunc(t *testing.T) {
 	}
 }
 
-func TestParsedNodeInfo(t *testing.T) {
+func TestParseNodeInfo(t *testing.T) {
 
-	m := ParsedNodeInfo(info)
+	m := ParseNodeInfo(info)
 
-	selections := []SelectionType{
+	selections := []sectionType{
 		Server,
 		Clients,
 		Memory,
@@ -297,8 +297,8 @@ func TestParsedNodeInfo(t *testing.T) {
 	}
 
 	replicationInfo := m[Replication]
-	t.Run("parsed replication info", func(t *testing.T) {
-		replm := ParsedReplicationInfo(replicationInfo)
+	t.Run("Parse replication info", func(t *testing.T) {
+		replm := ParseReplicationInfo(replicationInfo)
 		if replm == nil {
 			t.Fatal("empty map")
 		}

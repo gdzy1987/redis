@@ -1,18 +1,10 @@
 package topology
 
 import (
-	"errors"
-	"strconv"
+	"encoding/json"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/dengzitong/redis/client"
-)
-
-var (
-	ErrProbe      = errors.New("probe error")
-	ErrTopChanged = errors.New("top changed")
 )
 
 type Mode int
@@ -25,121 +17,6 @@ const (
 	MasterStr = `master`
 	SlaveStr  = `slave`
 )
-
-func fpComparison(s, t string) bool { return strings.Contains(s, t) }
-
-type NodeInfo struct {
-	Id     string `json:"node_id"`
-	Addr   string `json:"node_addr"`
-	Pass   string `json:"node_password"`
-	Ver    string `json:"node_version"`
-	Offset int64  `json:"node_offset"`
-
-	changed chan *NodeInfo
-	stopped chan *NodeInfo
-
-	c *client.Client
-}
-
-func CreateNodeInfo(addr string, pass string) (node *NodeInfo, stopped func()) {
-	node = &NodeInfo{
-		Addr: addr, Pass: pass,
-		stopped: make(chan *NodeInfo),
-	}
-
-	node.prepare()
-
-	node.surveySelf()
-	stopped = func() { node.stop() }
-	return node, stopped
-}
-
-func (n *NodeInfo) stop() { n.stopped <- n }
-
-func (n *NodeInfo) surveySelf() {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	go func() {
-		for {
-			select {
-			case <-n.stopped:
-				n.c.Close()
-				return
-			default:
-			}
-			// ignore error
-			reply, _ := client.String(n.c.Do("info"))
-			if len(reply) < 1 {
-				continue
-			}
-			mm := ParseNodeInfo(reply)
-			server, exist := mm[Server]
-			if !exist {
-				continue
-			}
-			if len(n.Ver) < 1 {
-				redis_version, exist := server["redis_version"]
-				if !exist {
-					continue
-				}
-				n.Ver = redis_version
-			}
-			if len(n.Id) < 1 {
-				run_id, exist := server["run_id"]
-				if !exist {
-					continue
-				}
-				n.Id = run_id
-			}
-
-			replication, exist := mm[Replication]
-			if !exist {
-				continue
-			}
-			offset, exist := replication["master_repl_offset"]
-			if !exist {
-				continue
-			}
-			_offset, _ := strconv.ParseInt(offset, 10, 64)
-			n.Offset = _offset
-			<-ticker.C
-		}
-	}()
-}
-
-func (n *NodeInfo) prepare() {
-	dialops := []client.DialOption{
-		client.DialMaxIdelConns(1),
-	}
-	if len(n.Pass) > 0 {
-		dialops = append(dialops,
-			client.DialPassword(n.Pass),
-		)
-	}
-	n.c = client.NewClient(n.Addr, dialops...)
-}
-
-type NodeInfos struct {
-	UUID         string      `json:"uuid"`
-	Members      []*NodeInfo `json:"nodes"`
-	Num          int         `json:"num"`
-	GlobalOffset int64       `json:"global_offset"`
-
-	changeds []chan *NodeInfo
-}
-
-func NewNodeInfos() *NodeInfos {
-	return &NodeInfos{
-		UUID:     "",
-		Members:  make([]*NodeInfo, 0),
-		Num:      0,
-		changeds: make([]chan *NodeInfo, 0),
-	}
-}
-
-func (ns *NodeInfos) AddNodeInfo(ni *NodeInfo) {
-
-}
 
 type Topology struct {
 	Mode        `json:"mode"`
@@ -254,8 +131,26 @@ type TopologyHandler interface {
 func NewTopologyHandler(mode Mode, addrs ...string) (t TopologyHandler, err error) {
 	switch mode {
 	case ClusterMode:
+
 	case SentinelMode:
+
 	case SingleMode:
 	}
 	return nil, nil
+}
+
+func UnmarshalFromBytes(mode Mode, p []byte) (TopologyHandler, error) {
+	var th TopologyHandler
+	switch mode {
+	case SingleMode:
+
+	case ClusterMode:
+
+	case SentinelMode:
+	}
+	err := json.Unmarshal(p, th)
+	if err != nil {
+		return nil, err
+	}
+	return th, nil
 }
