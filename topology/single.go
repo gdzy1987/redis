@@ -5,7 +5,6 @@ import "time"
 // redis single or master->slave architectural model
 type RedisSingle struct {
 	*NodeInfos `json:"nodes"`
-	stopped    chan *RedisSingle
 }
 
 func CreateRedisSingle(pass string, addrs ...string) *RedisSingle {
@@ -17,7 +16,6 @@ func CreateRedisSingle(pass string, addrs ...string) *RedisSingle {
 	}
 	return &RedisSingle{
 		nodeInfos,
-		make(chan *RedisSingle),
 	}
 }
 
@@ -26,7 +24,6 @@ func (r *RedisSingle) Run() Stop {
 		for i := range r.Members {
 			r.Members[i].Stop()
 		}
-		r.stopped <- r
 		return nil
 	}
 	return stop
@@ -35,22 +32,14 @@ func (r *RedisSingle) Run() Stop {
 func (r *RedisSingle) ReceiveNodeInfos() <-chan []*NodeInfo {
 	res := make(chan []*NodeInfo)
 	go func() {
-		secondTicker := time.NewTicker(1 * time.Second)
-		for {
-			select {
-			case <-r.stopped:
-				return
-			default:
-			}
-			node := r.Master()
-			if node == nil {
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			res <- []*NodeInfo{
-				node,
-			}
-			<-secondTicker.C
+	WAIT:
+		node := r.Master()
+		if node == nil {
+			time.Sleep(1 * time.Second)
+			goto WAIT
+		}
+		res <- []*NodeInfo{
+			node,
 		}
 	}()
 	return res

@@ -19,7 +19,6 @@ func (s *RedisCluster) Run() Stop {
 			for i := range r.Members {
 				r.Members[i].Stop()
 			}
-			r.stopped <- r
 		}
 		return nil
 	}
