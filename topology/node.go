@@ -1,20 +1,15 @@
 package topology
 
 import (
-	"errors"
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dengzitong/redis/client"
 )
 
-var (
-	ErrProbe      = errors.New("probe error")
-	ErrTopChanged = errors.New("top changed")
-)
-
-func fpComparison(s, t string) bool { return strings.Contains(s, t) }
+func concat(strs ...string) string { return strings.Join(strs, ":") }
 
 type NodeInfo struct {
 	Id     string `json:"node_id"`
@@ -24,7 +19,6 @@ type NodeInfo struct {
 	Offset int64  `json:"node_offset"`
 
 	IsMaster bool `json:"is_master"`
-	changed  chan *NodeInfo
 
 	c *client.Client
 }
@@ -92,41 +86,70 @@ func (n *NodeInfo) collect() {
 	n.IsMaster = (ismaster == MasterStr)
 }
 
-type NodeInfos struct {
-	UUID    string      `json:"uuid"`
-	Members []*NodeInfo `json:"nodes"` // index:0 is master node
-	Offset  int64       `json:"offset"`
-
+type NodeInfoGroup struct {
+	UUID string `json:"uuid"`
+	// Index:0 is master node
+	Members []*NodeInfo `json:"members_node"`
+	// Group offset
+	// In the process of switching,
+	// If the value is greater than the offset value of the instance to be run, then the value is discarded,
+	// And the full amount of data of the new instance is retrieved directly from -1
+	// Otherwise it continues from the current offset.
+	Offset int64 `json:"offset"`
+	// [{ip:port:runid}.String(),...]
+	MemberIds []string `json:"member_ids"`
+	// Node instance count
+	MemberCnt int32 `json:"member_cnt"`
+	// Identify current master run_id
 	MasterId string
-
-	changeds []chan *NodeInfo
+	// External incoming argsments address
+	ArgumentAddrs []string
+	// External incoming argsments password
+	ArgumentPasswrod string
 }
 
-func CreateNodeInfos() *NodeInfos {
-	return &NodeInfos{
-		UUID:     NewSUID().String(),
-		Members:  make([]*NodeInfo, 0),
-		changeds: make([]chan *NodeInfo, 0),
+func CreateNodeInfoGroup() *NodeInfoGroup {
+	return &NodeInfoGroup{
+		UUID:      NewSUID().String(),
+		Members:   make([]*NodeInfo, 0),
+		MemberIds: make([]string, 0),
 	}
 }
 
-func (ns *NodeInfos) Put(n *NodeInfo) {
+func CreateMSNodeGroup(pass string, addrs ...string) *NodeInfoGroup {
+	nig := CreateNodeInfoGroup()
+	for _, addr := range addrs {
+		node := CreateNodeInfo(addr, pass)
+		node.prepare()
+		nig.Put(node)
+	}
+	nig.ArgumentAddrs = addrs
+	nig.ArgumentPasswrod = pass
+	return nig
+}
+
+func (ns *NodeInfoGroup) Put(n *NodeInfo) {
+	atomic.AddInt32(&ns.MemberCnt, 1)
+	ns.MemberIds = append(
+		ns.MemberIds,
+		concat(n.Addr, n.Id),
+	)
 	ns.Members = append(ns.Members, n)
 }
 
-func (ns *NodeInfos) Len() int {
+func (ns *NodeInfoGroup) Len() int {
 	return len(ns.Members)
 }
 
-func (ns *NodeInfos) Less(i, j int) bool {
+func (ns *NodeInfoGroup) Less(i, j int) bool {
 	return ns.Members[i].IsMaster
 }
 
-func (ns *NodeInfos) Swap(i, j int) {
+func (ns *NodeInfoGroup) Swap(i, j int) {
 	ns.Members[i], ns.Members[j] = ns.Members[j], ns.Members[i]
 }
 
-func (ns *NodeInfos) Master() *NodeInfo {
+func (ns *NodeInfoGroup) Master() *NodeInfo {
 	if !ns.hasMaster() {
 		for _, member := range ns.Members {
 			member.collect()
@@ -136,11 +159,23 @@ func (ns *NodeInfos) Master() *NodeInfo {
 	return ns.Members[0]
 }
 
-func (ns *NodeInfos) hasMaster() bool {
+func (ns *NodeInfoGroup) hasMaster() bool {
 	for _, member := range ns.Members {
 		if member.IsMaster {
 			return true
 		}
 	}
 	return false
+}
+
+func (ns *NodeInfoGroup) Slaves() []*NodeInfo {
+restart:
+	if !ns.hasMaster() {
+		for _, member := range ns.Members {
+			member.collect()
+		}
+		goto restart
+	}
+	sort.Sort(ns)
+	return ns.Members[1:]
 }

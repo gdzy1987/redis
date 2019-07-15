@@ -235,23 +235,23 @@ a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbd
 	}
 )
 
-func TestProbeTopParseByInfo(t *testing.T) {
+func TestProbeTopParseInfoForMasters(t *testing.T) {
 
-	clusterAddrs, err := ParseByInfo(ClusterMode, otherClusterNodeInfo)
+	clusterAddrs, err := ParseInfoForMasters(ClusterMode, otherClusterNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(clusterAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	sentinelAddrs, err := ParseByInfo(SentinelMode, SentinelNodeInfo)
+	sentinelAddrs, err := ParseInfoForMasters(SentinelMode, SentinelNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(sentinelAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	singleAddrs, err := ParseByInfo(SingleMode, "localhost:1234")
+	singleAddrs, err := ParseInfoForMasters(SingleMode, "localhost:1234")
 	if err != nil {
 		t.Fatal(err)
 	} else if len(singleAddrs) < 1 {
@@ -263,15 +263,6 @@ func TestExec(t *testing.T) {
 	err := ExecTimeout(time.Second*1, "ps", "-ef")
 	if err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestProbeFunc(t *testing.T) {
-	ss, err := ProbeTopology("", ClusterMode, "10.1.1.228:7001")
-	if err != nil {
-		t.Fatal(err)
-	} else if len(ss) < 1 {
-		t.Fatal("expected cluster node")
 	}
 }
 
@@ -306,4 +297,72 @@ func TestParseNodeInfo(t *testing.T) {
 			t.Fatal("expected slave0 info not exist")
 		}
 	})
+}
+
+func TestListKey(t *testing.T) {
+	kl := createkeyList().
+		add("a").
+		add("b").
+		add("c")
+
+	if kl.String() != "a_b_c" {
+		t.Fatal("expected value not equal")
+	}
+
+	if !kl.include("a") && !kl.include("b") && !kl.include("c") {
+		t.Fatal("include error")
+	}
+}
+
+func TestParseCmdReplyToClusterNode(t *testing.T) {
+	info := `cebd9205cbde0d1ec4ad75600849a88f1f6294f6 10.1.1.228:7005@17005 master - 0 1562154209390 32 connected 5461-10922
+c6d165b72cfcd76d7662e559dc709e00e3dabf03 10.1.1.228:7001@17001 myself,master - 0 1562154207000 25 connected 0-5460
+885493415bea22919fc9ce83836a9e6a8d0c1314 10.1.1.228:7003@17003 master - 0 1562154207000 24 connected 10923-16383
+656042ad560b887164138a19dab2502154f8b039 10.1.1.228:7004@17004 slave c6d165b72cfcd76d7662e559dc709e00e3dabf03 0 1562154205381 25 connected
+a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbde0d1ec4ad75600849a88f1f6294f6 0 1562154208000 32 connected
+62bd020a2a5121a27c0e5540d1f0d4bba08cebb2 10.1.1.228:7006@17006 slave 885493415bea22919fc9ce83836a9e6a8d0c1314 0 1562154208388 24 connected
+`
+
+	mp, err := parseCmdReplyToClusterNode(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for k, v := range mp {
+		if k.include("cebd9205cbde0d1ec4ad75600849a88f1f6294f6") {
+			switch v[1].Id {
+			case "a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab":
+				break
+			default:
+				t.Fatal("slave error")
+			}
+			if k.String() != "cebd9205cbde0d1ec4ad75600849a88f1f6294f6_a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab" {
+				t.Fatal("string() error")
+			}
+		} else if k.include("c6d165b72cfcd76d7662e559dc709e00e3dabf03") {
+			switch v[1].Id {
+			case "656042ad560b887164138a19dab2502154f8b039":
+				break
+			default:
+				t.Fatal("slave error")
+			}
+			if k.String() != "c6d165b72cfcd76d7662e559dc709e00e3dabf03_656042ad560b887164138a19dab2502154f8b039" {
+				t.Fatal("string() error")
+			}
+		} else if k.include("885493415bea22919fc9ce83836a9e6a8d0c1314") {
+			switch v[1].Id {
+			case "62bd020a2a5121a27c0e5540d1f0d4bba08cebb2":
+				break
+			default:
+				t.Fatal("slave error")
+			}
+			if k.String() != "885493415bea22919fc9ce83836a9e6a8d0c1314_62bd020a2a5121a27c0e5540d1f0d4bba08cebb2" {
+				t.Fatal("string() error")
+			}
+		} else {
+			t.Fatal("master error")
+		}
+
+		_ = v
+	}
 }

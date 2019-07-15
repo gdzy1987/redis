@@ -2,12 +2,19 @@ package topology
 
 import (
 	"encoding/json"
-	"strings"
-	"sync/atomic"
-	"time"
+	"io"
 )
 
-type Mode int
+type (
+	Mode       int
+	StateType  int
+	StateEvent struct {
+		StateType
+		Error error
+		Name  string
+		Data  string
+	}
+)
 
 const (
 	SingleMode Mode = iota
@@ -18,92 +25,16 @@ const (
 	SlaveStr  = `slave`
 )
 
-type Topology struct {
-	Mode        `json:"mode"`
-	Fingerprint string      `json:"top_fingerprint"`
-	Master      *NodeInfo   `json:"top_master"`
-	Slaves      []*NodeInfo `json:"top_slaves"`
-	Offset      int64       `json:"top_offset"`
-	Password    string      `josn:"top_password"`
-
-	cancel func()
-}
-
-// cluster mode data node
-func (t *Topology) collect() {
-	if t.Slaves == nil {
-		t.Slaves = make([]*NodeInfo, 0)
-	}
-	// if there is old information you need to clear
-	t.Slaves = t.Slaves[:0]
-
-	// this is a serious mistake
-	ms, err := ProbeNode(t.Master.Addr, t.Password)
-	if err != nil {
-		panic(err)
-	}
-
-	serverInfoMap, exist := ms[Server]
-	if !exist {
-		panic("probe node info server selection not exist")
-	}
-
-	_, exist = serverInfoMap["redis_version"]
-	if !exist {
-		panic("probe node info server.redis_version not exist")
-	}
-
-	t.Master.Ver = serverInfoMap["redis_version"]
-
-	replicationInfoMap, exits := ms[Replication]
-	if !exits {
-		panic("probe node info replication selection not exist ")
-	}
-
-	slaveMap := ParseReplicationInfo(replicationInfoMap)
-	if slaveMap == nil {
-		return
-	}
-
-	nodeInfos, err := ParseSlaveInfo(slaveMap, "")
-	if err != nil {
-		panic(err)
-	}
-
-	for _, n := range nodeInfos {
-		t.fingerprintCorrection(n.Id)
-	}
-
-	t.Slaves = nodeInfos
-}
-
-func (t *Topology) fingerprintCorrection(s string) {
-	if strings.Contains(t.Fingerprint, s) {
-		return
-	}
-	t.Fingerprint = strings.Join(
-		[]string{t.Fingerprint, s},
-		"-",
-	)
-}
-
-func (t *Topology) UpdateOffset(i int64) { atomic.AddInt64(&t.Offset, i) }
-
-func (t *Topology) alwaysCollect() {
-	cancelSignal := make(chan struct{})
-	go func() {
-		tk := time.NewTicker(1 * time.Second)
-		for {
-			select {
-			case <-tk.C:
-				t.collect()
-			case <-cancelSignal:
-				return
-			}
-		}
-	}()
-	t.cancel = func() { cancelSignal <- struct{}{} }
-}
+const (
+	// node runing
+	RUNING StateType = iota
+	// During sent stop state
+	STOPPED
+	// Call node.collect timeout with 1 second
+	TIMEOUT
+	// Unexpected error occurred
+	BROKEN
+)
 
 type (
 	// service stop handle
@@ -115,13 +46,20 @@ type (
 )
 
 type Topologyer interface {
+	// Get master infos
 	// Topology service is ready served
 	// When used, it needs to return true if the service is fully operational, otherwise it will block
 	// When the topology of the backend changes
 	// You need to notify the caller to re-adjust the entire cluster connection
 	// Receive the topology information from the current architectural
 	// And provide the current real master nodeInfo
-	ReceiveNodeInfos() <-chan []*NodeInfo
+	// When the cluster mode has multiple masters
+	MasterNodeInfo() []*NodeInfo
+
+	SlaveNodeGroupInfo() []*NodeInfo
+
+	// Unmarshal
+	UnmarshalToWriter(io.Writer)
 
 	// The implementor needs to implement Basic interface template
 	// Return the service callback method
@@ -153,4 +91,9 @@ func UnmarshalFromBytes(mode Mode, p []byte) (Topologyer, error) {
 		return nil, err
 	}
 	return th, nil
+}
+
+type ToplogyHandler interface {
+	Start() error
+	Shutdown() error
 }

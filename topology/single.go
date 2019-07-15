@@ -1,21 +1,19 @@
 package topology
 
-import "time"
-
 // redis single or master->slave architectural model
 type RedisSingle struct {
-	*NodeInfos `json:"nodes"`
+	*NodeInfoGroup `json:"node_info_group"`
 }
 
 func CreateRedisSingle(pass string, addrs ...string) *RedisSingle {
-	nodeInfos := CreateNodeInfos()
+	NodeInfoGroup := CreateNodeInfoGroup()
 	for _, addr := range addrs {
 		node := CreateNodeInfo(addr, pass)
 		node.prepare()
-		nodeInfos.Put(node)
+		NodeInfoGroup.Put(node)
 	}
 	return &RedisSingle{
-		nodeInfos,
+		NodeInfoGroup,
 	}
 }
 
@@ -29,18 +27,10 @@ func (r *RedisSingle) Run() Stop {
 	return stop
 }
 
-func (r *RedisSingle) ReceiveNodeInfos() <-chan []*NodeInfo {
-	res := make(chan []*NodeInfo)
-	go func() {
-	WAIT:
-		node := r.Master()
-		if node == nil {
-			time.Sleep(1 * time.Second)
-			goto WAIT
-		}
-		res <- []*NodeInfo{
-			node,
-		}
-	}()
-	return res
+func (r *RedisSingle) MasterNodeInfo() []*NodeInfo {
+	return []*NodeInfo{r.Master()}
+}
+
+func (r *RedisSingle) SlaveNodeGroupInfo() []*NodeInfo {
+	return r.Slaves()
 }

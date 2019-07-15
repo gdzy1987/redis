@@ -71,7 +71,7 @@ repl_backlog_histlen:268435456`
 }
 
 func TestNodeInfosSort(t *testing.T) {
-	nis := &NodeInfos{
+	nis := &NodeInfoGroup{
 		Members: []*NodeInfo{
 			&NodeInfo{
 				Id:       "A",
@@ -388,7 +388,7 @@ func TestNodeInfos(t *testing.T) {
 	addrs, cancels := threeNode()
 	defer cancels()
 
-	nodes := CreateNodeInfos()
+	nodes := CreateNodeInfoGroup()
 	for _, addr := range addrs {
 		node := CreateNodeInfo(addr, "")
 		node.prepare()

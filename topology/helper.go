@@ -29,6 +29,31 @@ const (
 	Keyspace    sectionType = "Keyspace"
 )
 
+type keyList []string
+
+func createkeyList() *keyList {
+	kl := make(keyList, 0)
+	return &kl
+}
+
+func (kl *keyList) add(s string) *keyList {
+	*kl = append(*kl, s)
+	return kl
+}
+
+func (kl *keyList) include(s string) bool {
+	for i := range *kl {
+		if s == (*kl)[i] {
+			return true
+		}
+	}
+	return false
+}
+
+func (kl *keyList) String() string {
+	return strings.Join(*kl, "_")
+}
+
 //exec another process
 //if wait d Duration, it will kill the process
 //d is <= 0, wait forever
@@ -48,8 +73,10 @@ func ExecTimeout(d time.Duration, name string, args ...string) error {
 		done <- cmd.Wait()
 	}()
 
+	duration := time.Second * d
+	after := time.NewTimer(duration)
 	select {
-	case <-time.After(d):
+	case <-after.C:
 		cmd.Process.Kill()
 
 		//wait goroutine return
@@ -115,7 +142,7 @@ func ConvertAcmdSize(cmd string, args ...interface{}) ([]byte, int) {
 	buf.Write([]byte(lengthStr))
 	buf.Write([]byte{'\r', '\n'})
 
-	bulkCmd := func(v interface{}, buf *bytes.Buffer) {
+	buklCmd := func(v interface{}, buf *bytes.Buffer) {
 		var str []byte
 		buf.Write([]byte("$"))
 		switch v.(type) {
@@ -133,10 +160,10 @@ func ConvertAcmdSize(cmd string, args ...interface{}) ([]byte, int) {
 	}
 
 	// write cmd
-	bulkCmd(cmd, buf)
+	buklCmd(cmd, buf)
 
 	for i := 0; i < len(args); i++ {
-		bulkCmd(args[i], buf)
+		buklCmd(args[i], buf)
 	}
 	return buf.Bytes(), len(buf.Bytes())
 }
@@ -152,8 +179,9 @@ func (i *masterInfo) String() string {
 
 // Find the current topology based on the command
 // And return the cropping information of the current topology
-func ProbeTopology(pwd string, mode Mode, addrs ...string) ([]string, error) {
+func ProbeTopology(pwd string, mode Mode, addrs ...string) (interface{}, error) {
 	var redisClient *c.Client
+	defer redisClient.Close()
 
 	if reached, err := Ping(addrs...); err != nil {
 		return nil, err
@@ -184,16 +212,79 @@ func ProbeTopology(pwd string, mode Mode, addrs ...string) ([]string, error) {
 	case SingleMode:
 		info = addrs[0]
 	}
-	return ParseByInfo(mode, info)
+	return info, nil
 }
 
-func ParseByInfo(m Mode, info interface{}) ([]string, error) {
+func parseCmdReplyToClusterNode(info interface{}) (map[*keyList][]NodeInfo, error) {
+	var res = make(map[*keyList][]NodeInfo)
+
+	line, ok := info.(string)
+	if !ok {
+		return nil, errors.New("the info that needs to be Parse is not the type string is needed")
+	}
+
+	ss := strings.Split(line, "\n")
+	length := len(ss) - 1
+	if length < 1 {
+		return nil, errors.New("Parsed cmd result into empty")
+	}
+
+	for i := 0; i < length; i++ {
+		infoStr := ss[i]
+		if !strings.Contains(infoStr, MasterStr) {
+			continue
+		}
+
+		infoSS := strings.Split(infoStr, " ")
+		if len(infoSS) < 4 {
+			return nil, errors.New("Parse cluster mode line info error")
+		}
+
+		ni := NodeInfo{
+			Id:       infoSS[0],
+			Addr:     strings.Split(string(infoSS[1]), "@")[0],
+			IsMaster: true,
+		}
+		kl := createkeyList().add(ni.Id)
+		if _, exist := res[kl]; !exist {
+			res[kl] = make([]NodeInfo, 0)
+		}
+		res[kl] = append(res[kl], ni)
+	}
+
+	for k := range res {
+		for i := 0; i < length; i++ {
+			infoStr := ss[i]
+			if !strings.Contains(infoStr, SlaveStr) {
+				continue
+			}
+			infoSS := strings.Split(infoStr, " ")
+			if len(infoSS) < 4 {
+				return nil, errors.New("Parse cluster mode line info error")
+			}
+			if !k.include(infoSS[3]) {
+				continue
+			}
+			id := infoSS[0]
+			k.add(id)
+			res[k] = append(res[k], NodeInfo{
+				Id:       id,
+				Addr:     strings.Split(string(infoSS[1]), "@")[0],
+				IsMaster: false,
+			})
+		}
+	}
+
+	return res, nil
+}
+
+func ParseInfoForMasters(m Mode, info interface{}) ([]string, error) {
 	var res []string
 	switch m {
 	case ClusterMode:
 		line, ok := info.(string)
 		if !ok {
-			return nil, errors.New("the info that needs to be Parse is not the type string is needed")
+			return nil, errors.New("The info that needs to be Parse is not the type string is needed")
 		}
 		/*
 			# this 3 master and  3 slave cluster model info
@@ -209,7 +300,7 @@ func ParseByInfo(m Mode, info interface{}) ([]string, error) {
 		ss := strings.Split(line, "\n")
 		length := len(ss) - 1
 		if length < 1 {
-			return nil, errors.New("Parse cmd result empty")
+			return nil, errors.New("Parsed cmd result into empty")
 		}
 		res = make([]string, 0)
 		for i := 0; i < length; i++ {
@@ -239,7 +330,7 @@ func ParseByInfo(m Mode, info interface{}) ([]string, error) {
 	case SentinelMode:
 		masterSS, ok := info.([]string)
 		if !ok {
-			return nil, errors.New("the info that needs to be Parse is not the type []string is needed")
+			return nil, errors.New("The info that needs to be Parse is not the type []string is needed")
 		}
 		/*
 			# this 1 master sentinel model
@@ -271,7 +362,7 @@ func ParseByInfo(m Mode, info interface{}) ([]string, error) {
 	case SingleMode:
 		addr, ok := info.(string)
 		if !ok {
-			return nil, errors.New("the info that needs to be Parse is not the type []string is needed")
+			return nil, errors.New("The info that needs to be Parse is not the type []string is needed")
 		}
 		res = []string{addr}
 	}
@@ -315,7 +406,7 @@ func ProbeNode(addr string, pwd string) (map[sectionType]map[string]string, erro
 	return ParseNodeInfo(line), nil
 }
 
-// ParseNodeInfo parse the bulk string returned by the redis info command
+// ParseNodeInfo parse the bukl string returned by the redis info command
 func ParseNodeInfo(line string) map[sectionType]map[string]string {
 	redisInfo := make(map[sectionType]map[string]string)
 	strList := strings.Split(line, "\n")
