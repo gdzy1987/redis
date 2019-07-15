@@ -80,15 +80,15 @@ func (s *RedisCluster) SlaveNodeGroupInfo() []*NodeInfo {
 	return nodes
 }
 
-// func (s *RedisCluster) Notify() <-chan StateEvent {
-// 	notifyC := make(chan StateEvent)
+func (s *RedisCluster) Notify() <-chan StateEvent {
+	notifyC := make(chan StateEvent)
 
-// 	go func() {
-// 		for name, ngs := range s.Cluster {
-// 			members := ngs.Members
+	go func() {
+		for name, ngs := range s.Cluster {
+			members := ngs.Members
+			_, _ = members, name
+		}
+	}()
 
-// 		}
-// 	}()
-
-// 	return notifyC
-// }
+	return notifyC
+}
