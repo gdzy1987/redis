@@ -1,31 +1,30 @@
 package topology
 
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+)
+
 type RedisCluster struct {
 	// Multiple sets of msater slave information in one cluster
 	Cluster map[string]*NodeInfoGroup `json:"Cluster"`
-	// handler
-	Handler ToplogyHandler
-
-	stateC chan StateType
-
-	stopped chan struct{}
 }
 
 func CreateRedisCluster(pass string, addrss [][]string) *RedisCluster {
 	cluster := make(map[string]*NodeInfoGroup)
-	for i := range addrss {
-		addrGroup := addrss[i]
-		key := concat(addrGroup...)
-		cluster[key] = CreateMSNodeGroup(pass, addrGroup...)
-	}
-	return &RedisCluster{
-		Cluster: cluster,
-		stateC:  make(chan StateType),
-		stopped: make(chan struct{}),
-	}
-}
 
-func (s *RedisCluster) SetHandler(thr ToplogyHandler) { s.Handler = thr }
+	for i := range addrss {
+		mgs := CreateMSNodeGroup(pass, addrss[i]...)
+		key := createkeyList()
+		for _, v := range mgs.Members {
+			key.add(v.Id)
+		}
+		cluster[key.String()] = mgs
+	}
+
+	return &RedisCluster{Cluster: cluster}
+}
 
 func (s *RedisCluster) Run() Stop {
 	stop := func() error {
@@ -35,30 +34,12 @@ func (s *RedisCluster) Run() Stop {
 				r.Members[i].Stop()
 			}
 		}
-		// async stop
-		go func() {
-			s.stopped <- struct{}{}
-			close(s.stopped)
-		}()
 		return nil
 	}
 	return stop
 }
 
-func (s *RedisCluster) monitor() error {
-	for _, ngs := range s.Cluster {
-		info, err := ProbeTopology(
-			ngs.ArgumentPasswrod,
-			ClusterMode,
-			ngs.ArgumentAddrs...,
-		)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func (s *RedisCluster) MasterNodeInfo() []*NodeInfo {
+func (s *RedisCluster) masterNodeInfo() []*NodeInfo {
 	nodes := make([]*NodeInfo, 0)
 
 	for _, v := range s.Cluster {
@@ -69,26 +50,44 @@ func (s *RedisCluster) MasterNodeInfo() []*NodeInfo {
 	return nodes
 }
 
-func (s *RedisCluster) SlaveNodeGroupInfo() []*NodeInfo {
+func (s *RedisCluster) slaveNodeGroupInfo(n *NodeInfo) []*NodeInfo {
 	nodes := make([]*NodeInfo, 0)
 
-	for _, v := range s.Cluster {
-		nodeGroup := v
-		nodes = append(nodes, nodeGroup.Slaves()...)
+	for i := range s.Cluster {
+		members := s.Cluster[i].Members
+		lkey := createkeyList()
+		for _, ng := range members {
+			lkey.add(ng.Id)
+		}
+		if !lkey.include(n.Id) {
+			continue
+		}
+		nodes = members
+		break
 	}
-
 	return nodes
 }
 
-func (s *RedisCluster) Notify() <-chan StateEvent {
-	notifyC := make(chan StateEvent)
+func (s *RedisCluster) Topology() map[*NodeInfo][]*NodeInfo {
+	res := make(map[*NodeInfo][]*NodeInfo)
+	mns := s.masterNodeInfo()
+	for i := range mns {
+		m := mns[i]
+		s := s.slaveNodeGroupInfo(m)
+		res[m] = s
+	}
+	return res
+}
 
-	go func() {
-		for name, ngs := range s.Cluster {
-			members := ngs.Members
-			_, _ = members, name
-		}
-	}()
-
-	return notifyC
+// masrshal
+func (s *RedisCluster) MarshalToWriter(dst io.Writer) error {
+	p, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(dst, bytes.NewBuffer(p))
+	if err != nil {
+		return err
+	}
+	return nil
 }

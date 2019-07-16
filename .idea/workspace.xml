@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="7806f733-9db4-437f-946c-d4d4dd563ee4" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/topology/cluster.go" beforeDir="false" afterPath="$PROJECT_DIR$/topology/cluster.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topology/top.go" beforeDir="false" afterPath="$PROJECT_DIR$/topology/top.go" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/topology/single.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="342">
+              <caret line="19" column="34" lean-forward="true" selection-start-line="19" selection-start-column="34" selection-end-line="19" selection-end-column="34" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/topology/cluster.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="288">
+              <caret line="16" column="35" lean-forward="true" selection-start-line="16" selection-start-column="35" selection-end-line="16" selection-end-column="35" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/topology/node_test.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-217" />
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/topology/top_test.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-153" />
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="GOROOT" path="/usr/local/go" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GoLibraries">
+    <option name="indexEntireGoPath" value="false" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="eEDyJccb" />
+  </component>
+  <component name="ProjectFrameBounds">
+    <option name="y" value="23" />
+    <option name="width" value="1440" />
+    <option name="height" value="823" />
+  </component>
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="redis" type="b2602c69:ProjectViewProjectNode" />
+              <item name="redis" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="redis" type="b2602c69:ProjectViewProjectNode" />
+              <item name="redis" type="462c0819:PsiDirectoryNode" />
+              <item name="topology" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+      <pane id="Scope" />
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="go.gopath.indexing.explicitly.defined" value="true" />
+    <property name="go.import.settings.migrated" value="true" />
+    <property name="go.sdk.automatically.set" value="true" />
+    <property name="go.vgo.advertise" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Go Test.TestSentinelMode in github.com/dengzitong/redis/topology">
+    <configuration name="TestNodeInfo in github.com/dengzitong/redis/topology" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="redis" />
+      <working_directory value="$PROJECT_DIR$/topology" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/dengzitong/redis/topology" />
+      <pattern value="^TestNodeInfo$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestNodeInfosSort in github.com/dengzitong/redis/topology" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="redis" />
+      <working_directory value="$PROJECT_DIR$/topology" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/dengzitong/redis/topology" />
+      <pattern value="^TestNodeInfosSort$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestSentinelMode in github.com/dengzitong/redis/topology" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="redis" />
+      <working_directory value="$PROJECT_DIR$/topology" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/dengzitong/redis/topology" />
+      <pattern value="^TestSentinelMode$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestSingleMode in github.com/dengzitong/redis/topology" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="redis" />
+      <working_directory value="$PROJECT_DIR$/topology" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/dengzitong/redis/topology" />
+      <pattern value="^TestSingleMode$" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Go Test.TestSentinelMode in github.com/dengzitong/redis/topology" />
+        <item itemvalue="Go Test.TestSingleMode in github.com/dengzitong/redis/topology" />
+        <item itemvalue="Go Test.TestNodeInfosSort in github.com/dengzitong/redis/topology" />
+        <item itemvalue="Go Test.TestNodeInfo in github.com/dengzitong/redis/topology" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="TestHistory">
+    <history-entry file="TestNodeInfo_in_github_com_dengzitong_redis_topology - 2019.07.16 at 15h 40m 42s.xml">
+      <configuration name="TestNodeInfo in github.com/dengzitong/redis/topology" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestNodeInfosSort_in_github_com_dengzitong_redis_topology - 2019.07.16 at 15h 40m 57s.xml">
+      <configuration name="TestNodeInfosSort in github.com/dengzitong/redis/topology" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestSingleMode_in_github_com_dengzitong_redis_topology - 2019.07.16 at 15h 41m 07s.xml">
+      <configuration name="TestSingleMode in github.com/dengzitong/redis/topology" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestSentinelMode_in_github_com_dengzitong_redis_topology - 2019.07.16 at 15h 41m 18s.xml">
+      <configuration name="TestSentinelMode in github.com/dengzitong/redis/topology" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="0" y="23" width="1440" height="823" extended-state="0" />
+    <layout>
+      <window_info id="Favorites" side_tool="true" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.135" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info anchor="bottom" id="Docker" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Database Changes" />
+      <window_info anchor="bottom" id="Version Control" />
+      <window_info anchor="bottom" id="Terminal" />
+      <window_info anchor="bottom" id="Event Log" side_tool="true" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Find" order="1" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.32960895" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="right" id="Cargo" />
+      <window_info anchor="right" id="make" />
+      <window_info anchor="right" id="Database" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+    </layout>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/topology/single.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="342">
+          <caret line="19" column="34" lean-forward="true" selection-start-line="19" selection-start-column="34" selection-end-line="19" selection-end-column="34" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/topology/cluster.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="288">
+          <caret line="16" column="35" lean-forward="true" selection-start-line="16" selection-start-column="35" selection-end-line="16" selection-end-column="35" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/topology/node_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-217" />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/topology/top_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-153" />
+      </provider>
+    </entry>
+  </component>
+</project>

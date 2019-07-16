@@ -46,7 +46,6 @@ type (
 )
 
 type Topologyer interface {
-	// Get master infos
 	// Topology service is ready served
 	// When used, it needs to return true if the service is fully operational, otherwise it will block
 	// When the topology of the backend changes
@@ -54,13 +53,10 @@ type Topologyer interface {
 	// Receive the topology information from the current architectural
 	// And provide the current real master nodeInfo
 	// When the cluster mode has multiple masters
-	MasterNodeInfo() []*NodeInfo
+	Topology() map[*NodeInfo][]*NodeInfo
 
-	SlaveNodeGroupInfo() []*NodeInfo
-
-	// Unmarshal
-	UnmarshalToWriter(io.Writer)
-
+	// masrshal
+	MarshalToWriter(io.Writer) error
 	// The implementor needs to implement Basic interface template
 	// Return the service callback method
 	Basic
@@ -79,21 +75,18 @@ func NewTopologyer(mode Mode, addrs ...string) (t Topologyer, err error) {
 
 func UnmarshalFromBytes(mode Mode, p []byte) (Topologyer, error) {
 	var th Topologyer
+
 	switch mode {
 	case SingleMode:
-
+		th = &RedisSingle{}
 	case ClusterMode:
-
+		th = &RedisCluster{}
 	case SentinelMode:
+		th = &RedisSentinel{}
 	}
 	err := json.Unmarshal(p, th)
 	if err != nil {
 		return nil, err
 	}
 	return th, nil
-}
-
-type ToplogyHandler interface {
-	Start() error
-	Shutdown() error
 }
