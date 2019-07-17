@@ -213,6 +213,14 @@ func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err e
 	return nil, errors.New("mode error")
 }
 
+func removeBlank(strs []string) {
+	for i := range strs {
+		if len(strs[i]) == 0 || strs[i] == "" || strings.TrimSpace(strs[i]) == "" {
+			strs = append(strs[:i], strs[i+1:]...)
+		}
+	}
+}
+
 func parseCmdReplyToClusterNode(info interface{}) (map[*keyList][]NodeInfo, error) {
 	var res = make(map[*keyList][]NodeInfo)
 
@@ -222,7 +230,8 @@ func parseCmdReplyToClusterNode(info interface{}) (map[*keyList][]NodeInfo, erro
 	}
 
 	ss := strings.Split(line, "\n")
-	length := len(ss) - 1
+	removeBlank(ss)
+	length := len(ss)
 	if length < 1 {
 		return nil, errors.New("Parsed cmd result into empty")
 	}
@@ -510,14 +519,14 @@ func clusterAddr(pass string, addrs ...string) ([][]string, error) {
 	clusterAddrs := make([][]string, len(cmp), len(cmp))
 	i := 0
 	for k, _ := range cmp {
-		addrs := clusterAddrs[i]
+		addrs := &clusterAddrs[i]
 		if addrs == nil {
-			addrs = make([]string, 0)
+			*addrs = make([]string, 0)
 		}
 		nodes := cmp[k]
 		for j := range nodes {
-			ns := nodes[j]
-			addrs = append(addrs, ns.Addr)
+			ns := &nodes[j]
+			*addrs = append(*addrs, ns.Addr)
 		}
 		i++
 	}
