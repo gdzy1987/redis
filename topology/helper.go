@@ -57,7 +57,7 @@ func (kl *keyList) String() string {
 //exec another process
 //if wait d Duration, it will kill the process
 //d is <= 0, wait forever
-func ExecTimeout(d time.Duration, name string, args ...string) error {
+func execTimeout(d time.Duration, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 
 	if err := cmd.Start(); err != nil {
@@ -86,9 +86,9 @@ func ExecTimeout(d time.Duration, name string, args ...string) error {
 	}
 }
 
-// Ping analog icmp detection
-// Probe multiple addresses and return the address port that is currently responding within seconds
-func Ping(addrs ...string) ([]string, error) {
+// ping analog icmp detection
+// probe multiple addresses and return the address port that is currently responding within seconds
+func ping(addrs ...string) ([]string, error) {
 	res := make([]string, 0)
 	mu := sync.Mutex{}
 
@@ -133,8 +133,8 @@ func Ping(addrs ...string) ([]string, error) {
 	return res, nil
 }
 
-// Convert simple string command to Aof Command and calculate size
-func ConvertAcmdSize(cmd string, args ...interface{}) ([]byte, int) {
+// convert simple string command to Aof Command and calculate size
+func convertAcmdSize(cmd string, args ...interface{}) ([]byte, int) {
 	buf := bytes.NewBuffer(nil)
 
 	buf.Write([]byte{'*'})
@@ -179,11 +179,10 @@ func (i *masterInfo) String() string {
 
 // Find the current topology based on the command
 // And return the cropping information of the current topology
-func ProbeTopology(pwd string, mode Mode, addrs ...string) (interface{}, error) {
+func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err error) {
 	var redisClient *c.Client
-	defer redisClient.Close()
 
-	if reached, err := Ping(addrs...); err != nil {
+	if reached, err := ping(addrs...); err != nil {
 		return nil, err
 	} else if len(reached) < 1 {
 		return nil, errors.New("all addresses are unreachable")
@@ -194,7 +193,6 @@ func ProbeTopology(pwd string, mode Mode, addrs ...string) (interface{}, error) 
 			redisClient = c.NewClient(reached[0])
 		}
 	}
-	var info interface{}
 
 	switch mode {
 	case SentinelMode:
@@ -202,17 +200,17 @@ func ProbeTopology(pwd string, mode Mode, addrs ...string) (interface{}, error) 
 		if err != nil {
 			return nil, err
 		}
-		info = ss
+		return ss, nil
 	case ClusterMode:
 		s, err := c.String(redisClient.Do("cluster", "nodes"))
 		if err != nil {
 			return nil, err
 		}
-		info = s
+		return s, nil
 	case SingleMode:
-		info = addrs[0]
+		return addrs[0], nil
 	}
-	return info, nil
+	return nil, errors.New("mode error")
 }
 
 func parseCmdReplyToClusterNode(info interface{}) (map[*keyList][]NodeInfo, error) {
@@ -278,7 +276,7 @@ func parseCmdReplyToClusterNode(info interface{}) (map[*keyList][]NodeInfo, erro
 	return res, nil
 }
 
-func ParseInfoForMasters(m Mode, info interface{}) ([]string, error) {
+func parseInfoForMasters(m Mode, info interface{}) ([]string, error) {
 	var res []string
 	switch m {
 	case ClusterMode:
@@ -392,7 +390,7 @@ func fieldSplicing(m map[string]string, cols ...string) string {
 	return strings.Join(ss, ",")
 }
 
-func ProbeNode(addr string, pwd string) (map[sectionType]map[string]string, error) {
+func probeNode(addr string, pwd string) (map[sectionType]map[string]string, error) {
 	var redisClient *c.Client
 	if len(pwd) < 1 {
 		redisClient = c.NewClient(addr)
@@ -403,11 +401,11 @@ func ProbeNode(addr string, pwd string) (map[sectionType]map[string]string, erro
 	if err != nil {
 		return nil, err
 	}
-	return ParseNodeInfo(line), nil
+	return parseNodeInfo(line), nil
 }
 
-// ParseNodeInfo parse the bukl string returned by the redis info command
-func ParseNodeInfo(line string) map[sectionType]map[string]string {
+// parseNodeInfo parse the bukl string returned by the redis info command
+func parseNodeInfo(line string) map[sectionType]map[string]string {
 	redisInfo := make(map[sectionType]map[string]string)
 	strList := strings.Split(line, "\n")
 	selection := ""
@@ -428,7 +426,7 @@ func ParseNodeInfo(line string) map[sectionType]map[string]string {
 }
 
 // parsing information about the replication selection
-func ParseReplicationInfo(m map[string]string) map[string]string {
+func parseReplicationInfo(m map[string]string) map[string]string {
 	/*
 		role:master
 		connected_slaves:1
@@ -469,13 +467,13 @@ func ParseReplicationInfo(m map[string]string) map[string]string {
 }
 
 // ParseSlaveInfo call the probeNodeInfo function to implement the NodeInfo initialization parameters
-func ParseSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
+func parseSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
 	/*
 		map[string]string{"slave0":"10.1.1.228:7004"}
 	*/
 	res := make([]*NodeInfo, 0)
 	for _, v := range s {
-		allInfoMap, err := ProbeNode(v, pwd)
+		allInfoMap, err := probeNode(v, pwd)
 		if err != nil {
 			return nil, err
 		}
@@ -498,4 +496,30 @@ func ParseSlaveInfo(s map[string]string, pwd string) ([]*NodeInfo, error) {
 		})
 	}
 	return res, nil
+}
+
+func clusterAddr(pass string, addrs ...string) ([][]string, error) {
+	info, err := probeTopology(pass, ClusterMode, addrs...)
+	if err != nil {
+		return nil, err
+	}
+	cmp, err := parseCmdReplyToClusterNode(info)
+	if err != nil {
+		return nil, err
+	}
+	clusterAddrs := make([][]string, len(cmp), len(cmp))
+	i := 0
+	for k, _ := range cmp {
+		addrs := clusterAddrs[i]
+		if addrs == nil {
+			addrs = make([]string, 0)
+		}
+		nodes := cmp[k]
+		for j := range nodes {
+			ns := nodes[j]
+			addrs = append(addrs, ns.Addr)
+		}
+		i++
+	}
+	return clusterAddrs, nil
 }

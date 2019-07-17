@@ -340,6 +340,7 @@ func sixNode() ([][]string, func()) {
 	s2.AddHandles("info", func(rw *client.RespWriter, req [][]byte) error {
 		return rw.FlushBulk([]byte(node2))
 	})
+
 	cancel2, s2addr := s2.Serve("localhost:0")
 
 	s3 := client.NewVirtualServer(nil)

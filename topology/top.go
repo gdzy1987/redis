@@ -45,7 +45,7 @@ type (
 	}
 )
 
-type Topologyer interface {
+type Topologist interface {
 	// Topology service is ready served
 	// When used, it needs to return true if the service is fully operational, otherwise it will block
 	// When the topology of the backend changes
@@ -55,26 +55,31 @@ type Topologyer interface {
 	// When the cluster mode has multiple masters
 	Topology() map[*NodeInfo][]*NodeInfo
 
-	// masrshal
+	// marshal
 	MarshalToWriter(io.Writer) error
 	// The implementor needs to implement Basic interface template
 	// Return the service callback method
 	Basic
 }
 
-func NewTopologyer(mode Mode, addrs ...string) (t Topologyer, err error) {
+func NewTopologyist(mode Mode, pass string, addrs ...string) (t Topologist, err error) {
 	switch mode {
 	case ClusterMode:
-
+		cAddrs, err := clusterAddr(pass, addrs...)
+		if err != nil {
+			return nil, err
+		}
+		t = CreateRedisCluster(pass, cAddrs)
 	case SentinelMode:
-
+		t = CreateRedisSentinel(pass, addrs...)
 	case SingleMode:
+		t = CreateRedisSingle(pass, addrs...)
 	}
-	return nil, nil
+	return t, nil
 }
 
-func UnmarshalFromBytes(mode Mode, p []byte) (Topologyer, error) {
-	var th Topologyer
+func UnmarshalFromBytes(mode Mode, p []byte) (Topologist, error) {
+	var th Topologist
 
 	switch mode {
 	case SingleMode:

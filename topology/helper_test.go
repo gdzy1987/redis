@@ -163,7 +163,7 @@ func TestPing(t *testing.T) {
 	}()
 
 	t.Run("ping", func(t *testing.T) {
-		_addrs, err := Ping(addrs...)
+		_addrs, err := ping(addrs...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,7 +174,7 @@ func TestPing(t *testing.T) {
 }
 
 func TestCommandSize(t *testing.T) {
-	b, size := ConvertAcmdSize("ping")
+	b, size := convertAcmdSize("ping")
 	if size != 14 {
 		t.Fatal("expected length not equal.")
 	}
@@ -237,21 +237,21 @@ a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbd
 
 func TestProbeTopParseInfoForMasters(t *testing.T) {
 
-	clusterAddrs, err := ParseInfoForMasters(ClusterMode, otherClusterNodeInfo)
+	clusterAddrs, err := parseInfoForMasters(ClusterMode, otherClusterNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(clusterAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	sentinelAddrs, err := ParseInfoForMasters(SentinelMode, SentinelNodeInfo)
+	sentinelAddrs, err := parseInfoForMasters(SentinelMode, SentinelNodeInfo)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(sentinelAddrs) < 1 {
 		t.Fatal("need at least 1 master node")
 	}
 
-	singleAddrs, err := ParseInfoForMasters(SingleMode, "localhost:1234")
+	singleAddrs, err := parseInfoForMasters(SingleMode, "localhost:1234")
 	if err != nil {
 		t.Fatal(err)
 	} else if len(singleAddrs) < 1 {
@@ -260,7 +260,7 @@ func TestProbeTopParseInfoForMasters(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	err := ExecTimeout(time.Second*1, "ps", "-ef")
+	err := execTimeout(time.Second*1, "ps", "-ef")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func TestExec(t *testing.T) {
 
 func TestParseNodeInfo(t *testing.T) {
 
-	m := ParseNodeInfo(info)
+	m := parseNodeInfo(info)
 
 	selections := []sectionType{
 		Server,
@@ -289,7 +289,7 @@ func TestParseNodeInfo(t *testing.T) {
 
 	replicationInfo := m[Replication]
 	t.Run("Parse replication info", func(t *testing.T) {
-		replm := ParseReplicationInfo(replicationInfo)
+		replm := parseReplicationInfo(replicationInfo)
 		if replm == nil {
 			t.Fatal("empty map")
 		}

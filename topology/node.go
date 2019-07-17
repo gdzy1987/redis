@@ -49,7 +49,7 @@ func (n *NodeInfo) collect() {
 	if len(reply) < 1 {
 		return
 	}
-	mm := ParseNodeInfo(reply)
+	mm := parseNodeInfo(reply)
 	server, exist := mm[Server]
 	if !exist {
 		return
@@ -118,6 +118,7 @@ func CreateNodeInfoGroup() *NodeInfoGroup {
 
 func CreateMSNodeGroup(pass string, addrs ...string) *NodeInfoGroup {
 	nig := CreateNodeInfoGroup()
+
 	for _, addr := range addrs {
 		node := CreateNodeInfo(addr, pass)
 		node.prepare()
@@ -125,6 +126,7 @@ func CreateMSNodeGroup(pass string, addrs ...string) *NodeInfoGroup {
 	}
 	nig.ArgumentAddrs = addrs
 	nig.ArgumentPasswrod = pass
+
 	return nig
 }
 
