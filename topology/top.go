@@ -39,7 +39,7 @@ const (
 type (
 	// service stop handle
 	Stop func() error
-	// Basic
+	// Basic Run
 	Basic interface {
 		Run() Stop
 	}
