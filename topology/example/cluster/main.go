@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 
@@ -31,10 +30,8 @@ func main() {
 
 	stop := cluster.Run()
 	defer stop()
-
-	nodes := <-cluster.ReceiveNodeInfos()
-	for _, node := range nodes {
-		fmt.Printf("master node %v\n", node)
+	top := cluster.Topology()
+	if len(top) != 3 {
+		panic("expected 3 gourp")
 	}
-
 }

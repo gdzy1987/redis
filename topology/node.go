@@ -122,6 +122,7 @@ func CreateMSNodeGroup(pass string, addrs ...string) *NodeInfoGroup {
 	for _, addr := range addrs {
 		node := CreateNodeInfo(addr, pass)
 		node.prepare()
+		node.collect()
 		nig.Put(node)
 	}
 	nig.ArgumentAddrs = addrs

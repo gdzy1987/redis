@@ -17,12 +17,14 @@ func CreateRedisCluster(pass string, addrss [][]string) *RedisCluster {
 	cluster := make(map[string]*NodeInfoGroup)
 
 	for i := range addrss {
-		mgs := CreateMSNodeGroup(pass, addrss[i]...)
+		groupAddr := addrss[i]
+		mgs := CreateMSNodeGroup(pass, groupAddr...)
 		key := createkeyList()
-		for _, v := range mgs.Members {
-			key.add(v.Id)
+		for i := range mgs.Members {
+			key.add(mgs.Members[i].Id)
 		}
-		cluster[key.String()] = mgs
+		keystr := key.String()
+		cluster[keystr] = mgs
 	}
 
 	return &RedisCluster{Cluster: cluster}
