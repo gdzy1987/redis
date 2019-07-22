@@ -10,9 +10,13 @@ import (
 
 var OKReply = "OK"
 
-type notify struct {
-	ni []*topology.NodeInfo
-	oi []*topology.NodeInfo
+type respServer struct {
+	cli *client.Client
+	br  ByteReader
+}
+
+func (resp *respServer) start() error {
+	return nil
 }
 
 type Replication struct {
@@ -20,42 +24,55 @@ type Replication struct {
 
 	curTopMapped *topology.ToplogyMapped
 
-	changesC chan notify
-
-	respServer struct {
-		cli *client.Client
-		br  ByteReader
+	changesC chan struct {
+		ni []*topology.NodeInfo
+		oi []*topology.NodeInfo
 	}
+
+	respSrv *respServer
 }
 
-func (r *Replication) prepareNode(master *topology.NodeInfo) error {
+func NewReplication(topologist topology.Topologist) *Replication {
+	repl := &Replication{
+		changesC: make(chan struct {
+			ni []*topology.NodeInfo
+			oi []*topology.NodeInfo
+		},
+		),
+		Topologist: topologist,
+	}
+
+	return repl
+}
+
+func (r *Replication) prepareNode(master *topology.NodeInfo) (*respServer, error) {
 	repl_cli, ip, port, err := master.Client()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if master.Ver > "4.0.0" {
 		if ok, err := client.String(repl_cli.Do("replconf", "listening-port", port)); err != nil {
-			return err
+			return nil, err
 		} else if ok != OKReply {
-			return errors.New("replconf listening-port error")
+			return nil, errors.New("replconf listening-port error")
 		}
 
 		if ok, err := client.String(repl_cli.Do("replconf", "ip-address", ip)); err != nil {
-			return err
+			return nil, err
 		} else if ok != OKReply {
-			return errors.New("replconf ip-address error")
+			return nil, errors.New("replconf ip-address error")
 		}
 
 		if ok, err := client.String(repl_cli.Do("replconf", "capa", "eof")); err != nil {
-			return err
+			return nil, err
 		} else if ok != OKReply {
-			return errors.New("replconf capa eof error")
+			return nil, errors.New("replconf capa eof error")
 		}
 
 		if ok, err := client.String(repl_cli.Do("replconf", "capa", "psync2")); err != nil {
-			return err
+			return nil, err
 		} else if ok != OKReply {
-			return errors.New("replconf capa psync2 error")
+			return nil, errors.New("replconf capa psync2 error")
 		}
 	}
 	runID := ""
@@ -65,29 +82,36 @@ func (r *Replication) prepareNode(master *topology.NodeInfo) error {
 	} else {
 		repl_cli.Do("psync", master.Id, r.Topologist.Group(master).GroupOffset)
 	}
-	return nil
+	return &respServer{cli: repl_cli}, nil
 }
 
-func (r *Replication) PrepareDump() error {
+func (r *Replication) DumpAndParse() {
 	stop := r.Topologist.Run()
 	defer stop()
 	tops := r.Topologist.Topology()
 
 	// first initialization
 	for m, _ := range *tops {
-		err := r.prepareNode(m)
+		respSrv, err := r.prepareNode(m)
 		if err != nil {
-			return err
+			panic(err)
+		}
+		if err := respSrv.start(); err != nil {
+			panic(err)
 		}
 	}
-
 	r.curTopMapped = tops
-	// curTopMapped
 
-	return nil
+	// 1 second check
+	r.tickerOneSecCheck()
+
+	for {
+		<-r.changesC
+
+	}
 }
 
-func (r *Replication) onCheck() {
+func (r *Replication) tickerOneSecCheck() {
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		defer ticker.Stop()
@@ -98,9 +122,10 @@ func (r *Replication) onCheck() {
 			if !hasChanged {
 				continue
 			}
-			r.changesC <- notify{
-				ni, oi,
-			}
+			r.changesC <- struct {
+				ni []*topology.NodeInfo
+				oi []*topology.NodeInfo
+			}{ni, oi}
 		}
 	}()
 }
