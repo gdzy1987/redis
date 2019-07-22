@@ -31,7 +31,21 @@ func CreateNodeInfo(addr string, pass string) *NodeInfo {
 	}
 }
 
-func (n *NodeInfo) Client() (*client.Client, error) { return n.c, nil }
+func (n *NodeInfo) Client() (*client.Client, string, string, error) {
+	pool, err := n.c.Get()
+	if err != nil {
+		return nil, "", "", err
+	}
+	ip, port, err := pool.Conn.Addr()
+	if err != nil {
+		return nil, "", "", err
+	}
+	newCli, err := client.UseAlreadyConn(pool.Conn)
+	if err != nil {
+		return nil, "", "", err
+	}
+	return newCli, ip, port, nil
+}
 
 func (n *NodeInfo) Stop() {
 	defer func() {
