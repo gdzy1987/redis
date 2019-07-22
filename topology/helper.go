@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
-	"unsafe"
 
 	c "github.com/dengzitong/redis/client"
+	"github.com/dengzitong/redis/hack"
 )
 
 type sectionType string
@@ -33,9 +32,17 @@ const (
 
 type keyList []string
 
-func createkeyList() *keyList {
+func createKeyList() *keyList {
 	kl := make(keyList, 0)
 	return &kl
+}
+
+func unmarshalKeyList(s string) *keyList {
+	kl := createKeyList()
+	for _, v := range strings.Split(s, "_") {
+		kl.add(v)
+	}
+	return kl
 }
 
 func (kl *keyList) add(s string) *keyList {
@@ -187,30 +194,6 @@ func uint8sToBytes(p []uint8) []byte {
 	return np
 }
 
-// String converts slice to string without copy.
-// Use at your own risk.
-func String(b []byte) (s string) {
-	if len(b) == 0 {
-		return ""
-	}
-	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	pstring.Data = pbytes.Data
-	pstring.Len = pbytes.Len
-	return
-}
-
-// Slice converts string to slice without copy.
-// Use at your own risk.
-func Slice(s string) (b []byte) {
-	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	pbytes.Data = pstring.Data
-	pbytes.Len = pstring.Len
-	pbytes.Cap = pstring.Len
-	return
-}
-
 // Find the current topology based on the command
 // And return the cropping information of the current topology
 func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err error) {
@@ -255,7 +238,7 @@ func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err e
 				if !ok {
 					return nil, fmt.Errorf("assert slave error real type %T", slave)
 				}
-				slaveStrs = append(slaveStrs, String(uint8sToBytes(slave)))
+				slaveStrs = append(slaveStrs, hack.String(uint8sToBytes(slave)))
 			}
 			flags := fieldSplicing(sliceStr2Dict(slaveStrs), "flags")
 			if strings.Contains(flags, "s_down") {
@@ -317,7 +300,7 @@ func parseCmdReplyToClusterNode(info interface{}) (map[*keyList][]NodeInfo, erro
 			Addr:     strings.Split(string(infoSS[1]), "@")[0],
 			IsMaster: true,
 		}
-		kl := createkeyList().add(ni.Id)
+		kl := createKeyList().add(ni.Id)
 		if _, exist := res[kl]; !exist {
 			res[kl] = make([]NodeInfo, 0)
 		}
@@ -597,9 +580,4 @@ func clusterAddr(pass string, addrs ...string) ([][]string, error) {
 		i++
 	}
 	return clusterAddrs, nil
-}
-
-func sentinelAddrs(pass string, addrs ...string) ([]string, error) {
-
-	return nil, nil
 }

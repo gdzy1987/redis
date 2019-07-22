@@ -42,11 +42,11 @@ func TestSingleMode(t *testing.T) {
 	}
 
 	tmp := rs.Topology()
-	if len(tmp) > 1 {
+	if len(*tmp) > 1 {
 		t.Fatal("Expected only 1 master")
 	}
 
-	for k, v := range tmp {
+	for k, v := range *tmp {
 		if !k.IsMaster {
 			t.Fatal("Expected key is master")
 		}
@@ -199,7 +199,7 @@ func TestClusterMode(t *testing.T) {
 		t.Fatal("unmarshal byte cannot convert to Topologist interface error")
 	}
 
-	if len(ncs.Topology()) != len(rs.Topology()) {
+	if len(*(ncs.Topology())) != len(*(rs.Topology())) {
 		t.Fatal("unmarshal byte convert to Topologist and soruce object value not equal")
 	}
 }

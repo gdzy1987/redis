@@ -24,12 +24,14 @@ func CreateRedisSingle(pass string, addrs ...string) *RedisSingle {
 }
 
 func (r *RedisSingle) Run() Stop {
+
 	stop := func() error {
 		for i := range r.Members {
 			r.Members[i].Stop()
 		}
 		return nil
 	}
+
 	return stop
 }
 
@@ -41,11 +43,11 @@ func (r *RedisSingle) slaveNodeGroupInfo() []*NodeInfo {
 	return r.Slaves()
 }
 
-func (r *RedisSingle) Topology() map[*NodeInfo][]*NodeInfo {
-	res := make(map[*NodeInfo][]*NodeInfo)
+func (r *RedisSingle) Topology() *ToplogyMapped {
+	res := make(ToplogyMapped)
 	key, value := r.masterNodeInfo(), r.slaveNodeGroupInfo()
 	res[key] = value
-	return res
+	return &res
 }
 
 func (r *RedisSingle) MarshalToWriter(dst io.Writer) error {
@@ -58,4 +60,12 @@ func (r *RedisSingle) MarshalToWriter(dst io.Writer) error {
 		return err
 	}
 	return nil
+}
+
+func (s *RedisSingle) Increment(n *NodeInfo, offset int64) {
+	s.NodeInfoGroup.Update(offset)
+}
+
+func (s *RedisSingle) Offset(n *NodeInfo) string {
+	return s.NodeInfoGroup.Offset()
 }

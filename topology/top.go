@@ -45,10 +45,39 @@ type (
 	}
 )
 
+type ToplogyMapped map[*NodeInfo][]*NodeInfo
+
+func (t *ToplogyMapped) Compares(cur *ToplogyMapped) (newNodes []*NodeInfo, oldNodes []*NodeInfo, hasChanged bool) {
+	for i, v := range *t {
+		if _, ok := (*cur)[i]; !ok {
+			if oldNodes == nil {
+				oldNodes = make([]*NodeInfo, 0)
+			}
+			oldNodes = append(oldNodes, i)
+			hasChanged = true
+		}
+		_ = v
+	}
+	for i, v := range *cur {
+		if _, ok := (*t)[i]; !ok {
+			if newNodes == nil {
+				newNodes = make([]*NodeInfo, 0)
+			}
+			newNodes = append(newNodes, i)
+			hasChanged = true
+		}
+		_ = v
+	}
+	return
+}
+
 type Topologist interface {
 	// Get redis real server topology
-	Topology() map[*NodeInfo][]*NodeInfo
-
+	Topology() *ToplogyMapped
+	// Increment offset
+	Increment(*NodeInfo, int64)
+	// Offset get the string of offset
+	Offset(*NodeInfo) string
 	// marshal
 	MarshalToWriter(io.Writer) error
 	// The implementor needs to implement Basic interface template

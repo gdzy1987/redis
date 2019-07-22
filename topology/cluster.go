@@ -19,7 +19,7 @@ func CreateRedisCluster(pass string, addrss [][]string) *RedisCluster {
 	for i := range addrss {
 		groupAddr := addrss[i]
 		mgs := CreateMSNodeGroup(pass, groupAddr...)
-		key := createkeyList()
+		key := createKeyList()
 		for i := range mgs.Members {
 			key.add(mgs.Members[i].Id)
 		}
@@ -59,7 +59,7 @@ func (s *RedisCluster) slaveNodeGroupInfo(n *NodeInfo) []*NodeInfo {
 
 	for i := range s.Cluster {
 		members := s.Cluster[i].Members
-		lkey := createkeyList()
+		lkey := createKeyList()
 		for _, ng := range members {
 			lkey.add(ng.Id)
 		}
@@ -72,15 +72,15 @@ func (s *RedisCluster) slaveNodeGroupInfo(n *NodeInfo) []*NodeInfo {
 	return nodes
 }
 
-func (s *RedisCluster) Topology() map[*NodeInfo][]*NodeInfo {
-	res := make(map[*NodeInfo][]*NodeInfo)
+func (s *RedisCluster) Topology() *ToplogyMapped {
+	res := make(ToplogyMapped)
 	mns := s.masterNodeInfo()
 	for i := range mns {
 		m := mns[i]
 		s := s.slaveNodeGroupInfo(m)
 		res[m] = s
 	}
-	return res
+	return &res
 }
 
 // masrshal
@@ -95,3 +95,23 @@ func (s *RedisCluster) MarshalToWriter(dst io.Writer) error {
 	}
 	return nil
 }
+
+func (s *RedisCluster) Increment(n *NodeInfo, offset int64) {
+	for i, _ := range s.Cluster {
+		if unmarshalKeyList(i).include(n.Id) {
+			s.Cluster[i].Update(offset)
+		}
+		_ = i
+	}
+}
+
+func (s *RedisCluster) Offset(n *NodeInfo) string {
+	for i, _ := range s.Cluster {
+		if unmarshalKeyList(i).include(n.Id) {
+			return s.Cluster[i].Offset()
+		}
+		_ = i
+	}
+	return "-1"
+}
+

@@ -41,10 +41,10 @@ func (s *RedisSentinel) Run() Stop {
 	return stop
 }
 
-func (s *RedisSentinel) Topology() map[*NodeInfo][]*NodeInfo {
+func (s *RedisSentinel) Topology() *ToplogyMapped {
 	master := s.NodeInfoGroup.Master()
 	slaves := s.NodeInfoGroup.Slaves()
-	return map[*NodeInfo][]*NodeInfo{
+	return &ToplogyMapped{
 		master: slaves,
 	}
 }
@@ -59,4 +59,12 @@ func (s *RedisSentinel) MarshalToWriter(dst io.Writer) error {
 		return err
 	}
 	return nil
+}
+
+func (s *RedisSentinel) Increment(n *NodeInfo, offset int64) {
+	s.NodeInfoGroup.Update(offset)
+}
+
+func (s *RedisSentinel) Offset(n *NodeInfo) string {
+	return s.NodeInfoGroup.Offset()
 }

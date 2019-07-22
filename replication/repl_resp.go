@@ -7,6 +7,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/dengzitong/redis/hack"
 )
 
 const bufsz = 4096
@@ -90,7 +92,7 @@ func (v Value) String() string {
 	}
 	switch v.Typ {
 	case '+', '-':
-		return string(v.Str)
+		return hack.String(v.Str)
 	case ':':
 		return strconv.FormatInt(int64(v.IntegerV), 10)
 	case '*':
@@ -135,20 +137,16 @@ func (v Value) Float() float64 {
 }
 
 // IsNull indicates whether or not the base value is null.
-func (v Value) IsNull() bool {
-	return v.Null
-}
+func (v Value) IsNull() bool { return v.Null }
 
 // Bool converts Value to an bool. If Value cannot be converted, false is returned.
-func (v Value) Bool() bool {
-	return v.Integer() != 0
-}
+func (v Value) Bool() bool { return v.Integer() != 0 }
 
 // Error converts the Value to an error. If Value is not an error, nil is returned.
 func (v Value) Error() error {
 	switch v.Typ {
 	case '-':
-		return errors.New(string(v.Str))
+		return errors.New(hack.String(v.Str))
 	}
 	return nil
 }
@@ -169,6 +167,8 @@ func (v Value) Array() []Value {
 //   ':'  Integer
 //   '$'  BulkString
 //   '*'  Array
+//   'R' Rdb
+//   '\r' Crlf
 func (v Value) Type() Type {
 	if bytes.HasPrefix(v.Str, []byte(`FULLRESYNC`)) || bytes.HasPrefix(v.Str, []byte(`+FULLRESYNC`)) {
 		return Rdb

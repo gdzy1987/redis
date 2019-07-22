@@ -1,6 +1,7 @@
 package topology
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -95,7 +96,7 @@ type NodeInfoGroup struct {
 	// If the value is greater than the offset value of the instance to be run, then the value is discarded,
 	// And the full amount of data of the new instance is retrieved directly from -1
 	// Otherwise it continues from the current offset.
-	Offset int64 `json:"offset"`
+	GroupOffset int64 `json:"group_offset"`
 	// [{ip:port:runid}.String(),...]
 	MemberIds []string `json:"member_ids"`
 	// Node instance count
@@ -179,4 +180,12 @@ func (ns *NodeInfoGroup) Slaves() []*NodeInfo {
 	}
 	sort.Sort(ns)
 	return ns.Members[1:]
+}
+
+func (ns *NodeInfoGroup) Update(offset int64) {
+	ns.GroupOffset = offset
+}
+
+func (ns *NodeInfoGroup) Offset() string {
+	return fmt.Sprintf("%d", ns.GroupOffset)
 }

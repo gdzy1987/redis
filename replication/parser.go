@@ -48,8 +48,8 @@ func (d *rdbDecode) Parse(dr Decoder) error {
 	return d.decode(false)
 }
 
-func (d *rdbDecode) decode(file bool) error {
-	err := d.checkHeader(file)
+func (d *rdbDecode) decode(isfile bool) error {
+	err := d.checkHeader(isfile)
 	if err != nil {
 		return err
 	}
