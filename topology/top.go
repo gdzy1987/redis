@@ -76,6 +76,8 @@ type Topologist interface {
 	Topology() *ToplogyMapped
 	// Increment offset
 	Increment(*NodeInfo, int64)
+	// Group get current node groupAddr
+	Group(*NodeInfo) *NodeInfoGroup
 	// Offset get the string of offset
 	Offset(*NodeInfo) string
 	// marshal

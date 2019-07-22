@@ -31,7 +31,15 @@ func CreateNodeInfo(addr string, pass string) *NodeInfo {
 	}
 }
 
-func (n *NodeInfo) Stop() { n.c.Close() }
+func (n *NodeInfo) Stop() {
+	defer func() {
+		// repeated closing error
+		if err := recover(); err != nil {
+			// println("try to close a client that has been closed")
+		}
+	}()
+	n.c.Close()
+}
 
 func (n *NodeInfo) prepare() {
 	dialops := []client.DialOption{
@@ -180,6 +188,12 @@ func (ns *NodeInfoGroup) Slaves() []*NodeInfo {
 	}
 	sort.Sort(ns)
 	return ns.Members[1:]
+}
+
+func (ns *NodeInfoGroup) CloseAllMember() {
+	for _, member := range ns.Members {
+		member.Stop()
+	}
 }
 
 func (ns *NodeInfoGroup) Update(offset int64) {

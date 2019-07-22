@@ -68,3 +68,7 @@ func (s *RedisSentinel) Increment(n *NodeInfo, offset int64) {
 func (s *RedisSentinel) Offset(n *NodeInfo) string {
 	return s.NodeInfoGroup.Offset()
 }
+
+func (s *RedisSentinel) Group(n *NodeInfo) *NodeInfoGroup {
+	return s.NodeInfoGroup
+}

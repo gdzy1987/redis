@@ -115,3 +115,12 @@ func (s *RedisCluster) Offset(n *NodeInfo) string {
 	return "-1"
 }
 
+func (s *RedisCluster) Group(n *NodeInfo) *NodeInfoGroup {
+	for i, _ := range s.Cluster {
+		if unmarshalKeyList(i).include(n.Id) {
+			return s.Cluster[i]
+		}
+		_ = i
+	}
+	return nil
+}

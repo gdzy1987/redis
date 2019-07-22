@@ -41,7 +41,10 @@ func main() {
 		if s != "12345" {
 			panic("expected value is unusual")
 		}
+		// group := toplogyist.Group(k)
+		// group.CloseAllMember()
 	}
+	stop()
 
 	// SentinelMode Redis server
 	toplogyist = topology.CreateRedisSentinel("wtf", "10.1.1.228:21001", "10.1.1.228:21002", "10.1.1.228:21003")
@@ -55,7 +58,6 @@ func main() {
 			panic("expected value is unusual")
 		}
 	}
-
 	stop1()
 
 	// SingleMode Redis server
