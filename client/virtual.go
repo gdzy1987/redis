@@ -11,11 +11,13 @@ import (
 )
 
 type DataStorage interface {
+	// data operate command
 	Set([]byte, []byte) error
 	Get([]byte) ([]byte, error)
 	Hset([]byte, []byte, []byte) error
 	Hget([]byte, []byte) ([]byte, error)
 
+	// system command
 	Cluster() ([]byte, error)
 	Sentinel() ([]interface{}, error)
 	Info() ([]byte, error)
@@ -33,10 +35,10 @@ type VirtualServer struct {
 
 func NewVirtualServer(stge DataStorage) *VirtualServer {
 	return &VirtualServer{
-		mu:          sync.Mutex{},
-		DataStorage: stge,
+		mu: sync.Mutex{},
 
-		handles: make(map[string]HandlesFunc),
+		DataStorage: stge,
+		handles:     make(map[string]HandlesFunc),
 	}
 }
 
@@ -94,6 +96,7 @@ func (v *VirtualServer) serverHandler(conn net.Conn) {
 
 func (v *VirtualServer) handerRequest(rWriter *RespWriter, req [][]byte) error {
 	var cmd string
+
 	if len(req) == 0 {
 		cmd = ""
 	} else {
@@ -103,5 +106,6 @@ func (v *VirtualServer) handerRequest(rWriter *RespWriter, req [][]byte) error {
 	if !exist {
 		return errors.New("undefine handles")
 	}
+
 	return v.handles[cmd](rWriter, req)
 }

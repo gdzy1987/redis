@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	c "github.com/dengzitong/redis/client"
 )
@@ -177,6 +179,38 @@ func (i *masterInfo) String() string {
 	return strings.Join([]string{i.id, i.ip}, ",")
 }
 
+func uint8sToBytes(p []uint8) []byte {
+	np := make([]byte, len(p), len(p))
+	for i := range p {
+		np[i] = byte(p[i])
+	}
+	return np
+}
+
+// String converts slice to string without copy.
+// Use at your own risk.
+func String(b []byte) (s string) {
+	if len(b) == 0 {
+		return ""
+	}
+	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	pstring.Data = pbytes.Data
+	pstring.Len = pbytes.Len
+	return
+}
+
+// Slice converts string to slice without copy.
+// Use at your own risk.
+func Slice(s string) (b []byte) {
+	pbytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	pstring := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	pbytes.Data = pstring.Data
+	pbytes.Len = pstring.Len
+	pbytes.Cap = pstring.Len
+	return
+}
+
 // Find the current topology based on the command
 // And return the cropping information of the current topology
 func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err error) {
@@ -188,7 +222,11 @@ func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err e
 		return nil, errors.New("all addresses are unreachable")
 	} else {
 		if len(pwd) > 0 {
-			redisClient = c.NewClient(reached[0], c.DialPassword(pwd))
+			if mode == ClusterMode {
+				redisClient = c.NewClient(reached[0], c.DialPassword(pwd))
+			} else {
+				redisClient = c.NewClient(reached[0])
+			}
 		} else {
 			redisClient = c.NewClient(reached[0])
 		}
@@ -196,17 +234,44 @@ func probeTopology(pwd string, mode Mode, addrs ...string) (i interface{}, err e
 
 	switch mode {
 	case SentinelMode:
-		ss, err := c.Strings(redisClient.Do("sentinel", "master", "mymaster"))
+		result := make([][]string, 0)
+		masterSS, err := c.Strings(redisClient.Do("sentinel", "master", "mymaster"))
 		if err != nil {
 			return nil, err
 		}
-		return ss, nil
+		result = append(result, masterSS)
+		slaveSS, err := c.MultiBulk(redisClient.Do("sentinel", "slaves", "mymaster"))
+		if err != nil {
+			return nil, err
+		}
+		for i := range slaveSS {
+			slaveInterfaces, ok := slaveSS[i].([]interface{})
+			if !ok {
+				return nil, fmt.Errorf("assert slaves type error real type is %T", slaveInterfaces)
+			}
+			slaveStrs := make([]string, 0)
+			for y := range slaveInterfaces {
+				slave, ok := slaveInterfaces[y].([]uint8)
+				if !ok {
+					return nil, fmt.Errorf("assert slave error real type %T", slave)
+				}
+				slaveStrs = append(slaveStrs, String(uint8sToBytes(slave)))
+			}
+			flags := fieldSplicing(sliceStr2Dict(slaveStrs), "flags")
+			if strings.Contains(flags, "s_down") {
+				continue
+			}
+			result = append(result, slaveStrs)
+		}
+		return result, nil
+
 	case ClusterMode:
 		s, err := c.String(redisClient.Do("cluster", "nodes"))
 		if err != nil {
 			return nil, err
 		}
 		return s, nil
+
 	case SingleMode:
 		return addrs[0], nil
 	}
@@ -305,7 +370,8 @@ func parseInfoForMasters(m Mode, info interface{}) ([]string, error) {
 		*/
 
 		ss := strings.Split(line, "\n")
-		length := len(ss) - 1
+		removeBlank(ss)
+		length := len(ss)
 		if length < 1 {
 			return nil, errors.New("Parsed cmd result into empty")
 		}
@@ -531,4 +597,9 @@ func clusterAddr(pass string, addrs ...string) ([][]string, error) {
 		i++
 	}
 	return clusterAddrs, nil
+}
+
+func sentinelAddrs(pass string, addrs ...string) ([]string, error) {
+
+	return nil, nil
 }

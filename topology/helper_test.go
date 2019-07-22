@@ -366,3 +366,84 @@ a70fbd191b4e00ff6d65c71d9d2c6f15d1adbcab 10.1.1.228:7002@17002 slave cebd9205cbd
 		_ = v
 	}
 }
+
+// var (
+// 	SentinelMaster = []interface{}{
+// 		[]byte("name"),
+// 		[]byte("mymaster"),
+// 		[]byte("ip"),
+// 		[]byte("127.0.0.1"),
+// 		[]byte("port"),
+// 		[]byte("8001"),
+// 		[]byte("runid"),
+// 		[]byte("8be9401d095b9072b2e67c59fea68894e14da193"),
+// 		[]byte("flags"),
+// 		[]byte("master"),
+// 	}
+// 	SentinelSlave1 = []interface{}{
+// 		[]byte("name"),
+// 		[]byte("mymaster"),
+// 		[]byte("ip"),
+// 		[]byte("127.0.0.1"),
+// 		[]byte("port"),
+// 		[]byte("8002"),
+// 		[]byte("runid"),
+// 		[]byte("8be9401d095b9072b2e67c59fea68894e14da194"),
+// 		[]byte("flags"),
+// 		[]byte("master"),
+// 	}
+// 	SentinelSlave2 = []interface{}{
+// 		[]byte("name"),
+// 		[]byte("mymaster"),
+// 		[]byte("ip"),
+// 		[]byte("127.0.0.1"),
+// 		[]byte("port"),
+// 		[]byte("8003"),
+// 		[]byte("runid"),
+// 		[]byte("8be9401d095b9072b2e67c59fea68894e14da195"),
+// 		[]byte("flags"),
+// 		[]byte("slave"),
+// 	}
+// )
+
+// func TestProbeTopology(t *testing.T) {
+// 	x, err := probeTopology("", SentinelMode, "10.1.1.228:21001")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	_ = x
+// }
+
+func TestString(t *testing.T) {
+	b := []byte("hello world")
+	a := String(b)
+
+	if a != "hello world" {
+		t.Fatal(a)
+	}
+
+	b[0] = 'a'
+
+	if a != "aello world" {
+		t.Fatal(a)
+	}
+
+	b = append(b, "abc"...)
+
+	t.Logf("a:%s,b:%s", a, b)
+	// the result:a:aello world,b:aello worldabc
+	// the reason is a is fixed length slice
+	if a != "aello world" {
+		t.Fatalf("a:%v, b:%v", a, b)
+	}
+}
+
+func TestByte(t *testing.T) {
+	a := "hello world"
+
+	b := Slice(a)
+
+	if !bytes.Equal(b, []byte("hello world")) {
+		t.Fatal(string(b))
+	}
+}
