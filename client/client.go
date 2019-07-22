@@ -62,6 +62,24 @@ func NewClient(addr string, dialOpts ...DialOption) *Client {
 	return c
 }
 
+func UseAlreadyConn(c *Conn) (*Client, error) {
+	cli := new(Client)
+
+	ip, port, err := c.Addr()
+	if err != nil {
+		return nil, err
+	}
+
+	cli.addr = strings.Join([]string{ip, port}, ":")
+	cli.conns = list.New()
+	cli.quit = make(chan struct{})
+
+	cli.wg.Add(1)
+	go cli.onCheck()
+
+	return cli, nil
+}
+
 func (c *Client) Do(cmd string, args ...interface{}) (interface{}, error) {
 	var co *Conn
 	var err error

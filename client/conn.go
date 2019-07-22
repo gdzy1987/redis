@@ -3,6 +3,7 @@ package client
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -27,6 +28,14 @@ type Conn struct {
 	totalWriteSize sizeWriter
 
 	closed int32
+}
+
+func (c *Conn) Addr() (string, string, error) {
+	localAddr, ok := c.LocalAddr().(*net.TCPAddr)
+	if !ok {
+		return "", "", errors.New("get local addr error")
+	}
+	return net.SplitHostPort(localAddr.String())
 }
 
 func Connect(addr string, opt *Options) (*Conn, error) {

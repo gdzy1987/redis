@@ -31,6 +31,8 @@ func CreateNodeInfo(addr string, pass string) *NodeInfo {
 	}
 }
 
+func (n *NodeInfo) Client() (*client.Client, error) { return n.c, nil }
+
 func (n *NodeInfo) Stop() {
 	defer func() {
 		// repeated closing error
@@ -43,7 +45,7 @@ func (n *NodeInfo) Stop() {
 
 func (n *NodeInfo) prepare() {
 	dialops := []client.DialOption{
-		client.DialMaxIdelConns(1),
+		client.DialMaxIdelConns(2),
 	}
 	if len(n.Pass) > 0 {
 		dialops = append(dialops,

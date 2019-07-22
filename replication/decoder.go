@@ -10,15 +10,6 @@ type ByteReader interface {
 	io.ByteScanner // io.ByteReader
 }
 
-type OffsetHandler interface {
-	Increment(int64)
-	Offset() string
-}
-
-type CommandDecoder interface {
-	Command(cmd *Command) error
-}
-
 // A Decodr must be implemented to parse a RDB io.Reader &  parse a command io.Reader
 type Decoder interface {
 	// BeginDatabase is called when database n Begins.
@@ -72,14 +63,6 @@ type Decoder interface {
 	// EndDatabase is called at the end of a database.
 	EndDatabase(n int)
 
-	RDBDecoder
-}
-
-type Closer interface {
-	io.Closer
-}
-
-type RDBDecoder interface {
 	// BeginRDB is called when parsing of a valid RDB file Begins.
 	BeginRDB()
 	// EndRDB is called when parsing of the RDB file is complete.
@@ -88,6 +71,10 @@ type RDBDecoder interface {
 	Aux(key, value []byte)
 	// ResizeDB hint
 	ResizeDatabase(dbSize, expiresSize uint32)
+}
+
+type Closer interface {
+	io.Closer
 }
 
 // Nop may be embedded in a real Decoder to avoid implementing methods.

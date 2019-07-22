@@ -14,12 +14,20 @@ import (
 )
 
 func decodeStream(r io.Reader, d Decoder) error {
-	decoder := &rdbDecode{d, make([]byte, 8), bufio.NewReader(r)}
+	decoder := &rdbDecode{
+		d,
+		make([]byte, 8),
+		bufio.NewReader(r),
+	}
 	return decoder.decode(false)
 }
 
 func decodeFile(r io.Reader, d Decoder) error {
-	decoder := &rdbDecode{d, make([]byte, 8), bufio.NewReader(r)}
+	decoder := &rdbDecode{
+		d,
+		make([]byte, 8),
+		bufio.NewReader(r),
+	}
 	return decoder.decode(true)
 }
 

@@ -3,29 +3,34 @@ package replication
 import (
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/dengzitong/redis/hack"
 )
 
 // Command all the command combinations
 type Command struct {
 	T CommandType
-	D []string
+	D [][]byte
 }
 
 func (c *Command) String() string {
-	return strings.Join(c.D, " ")
+	ss := make([]string, len(c.D), len(c.D))
+	for i := range c.D {
+		ss[i] = hack.String(c.D[i])
+	}
+	return strings.Join(ss, " ")
 }
 
 func (c *Command) Type() CommandType {
-	cmdType, exists := CommandTypeMap[c.D[0]]
-	if !exists {
+	cmdStr := hack.String(c.D[0])
+	t, exist := CommandTypeMap[cmdStr]
+	if !exist {
 		return Undefined
 	}
-	return cmdType
+	return t
 }
 
-func (c *Command) CommandName() string {
-	return c.D[0]
+func (c *Command) CmdTypeName() string {
+	return CommandNameMap[c.T]
 }
 
 func (c *Command) Args() []interface{} {
@@ -36,13 +41,9 @@ func (c *Command) Args() []interface{} {
 	return args
 }
 
-func buildStrCommand(s string) []string {
-	return strings.Split(s, " ")
-}
-
-func NewCommand(args ...string) (*Command, error) {
-	if len(args) == 0 {
-		return nil, errors.New("Empty args.")
+func NewCommand(cmdType CommandType, args ...[]byte) *Command {
+	return &Command{
+		T: cmdType,
+		D: args,
 	}
-	return &Command{D: args}, nil
 }
