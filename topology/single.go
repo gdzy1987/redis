@@ -8,7 +8,7 @@ import (
 
 // redis single or master->slave architectural model
 type RedisSingle struct {
-	*NodeInfoGroup `json:"node_info_group"`
+	*NodeInfoGroup `json:"single"`
 }
 
 func CreateRedisSingle(pass string, addrs ...string) *RedisSingle {

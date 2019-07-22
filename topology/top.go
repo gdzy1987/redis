@@ -46,13 +46,7 @@ type (
 )
 
 type Topologist interface {
-	// Topology service is ready served
-	// When used, it needs to return true if the service is fully operational, otherwise it will block
-	// When the topology of the backend changes
-	// You need to notify the caller to re-adjust the entire cluster connection
-	// Receive the topology information from the current architectural
-	// And provide the current real master nodeInfo
-	// When the cluster mode has multiple masters
+	// Get redis real server topology
 	Topology() map[*NodeInfo][]*NodeInfo
 
 	// marshal

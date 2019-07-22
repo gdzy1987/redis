@@ -10,7 +10,7 @@ var _ = Topologist(&RedisCluster{})
 
 type RedisCluster struct {
 	// Multiple sets of msater slave information in one cluster
-	Cluster map[string]*NodeInfoGroup `json:"Cluster"`
+	Cluster map[string]*NodeInfoGroup `json:"cluster"`
 }
 
 func CreateRedisCluster(pass string, addrss [][]string) *RedisCluster {

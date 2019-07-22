@@ -8,7 +8,7 @@ import (
 )
 
 type RedisSentinel struct {
-	*NodeInfoGroup `json:"Sentinel"`
+	*NodeInfoGroup `json:"sentinel"`
 }
 
 func CreateRedisSentinel(pass string, addrs ...string) *RedisSentinel {
