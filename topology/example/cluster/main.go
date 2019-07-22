@@ -38,6 +38,7 @@ func main() {
 		println(jsonPrettyPrint(fmt.Sprintf(`{ master:"%+v" , slave:"%+v" }`, k, v[1])))
 	}
 
+	// SentinelMode Redis server
 	toplogyist = topology.CreateRedisSentinel("wtf", "10.1.1.228:21001", "10.1.1.228:21002", "10.1.1.228:21003")
 	stop1 := toplogyist.Run()
 	top = toplogyist.Topology()
@@ -46,4 +47,14 @@ func main() {
 	}
 
 	stop1()
+
+	// SingleMode Redis server
+	toplogyist = topology.CreateRedisSingle("", "127.0.0.1:6379")
+	stop2 := toplogyist.Run()
+	top = toplogyist.Topology()
+	for k, v := range top {
+		println(jsonPrettyPrint(fmt.Sprintf(`{ master:"%+v" , slaves:"%#v" }`, k, v)))
+	}
+
+	stop2()
 }

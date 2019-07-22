@@ -172,12 +172,10 @@ func (ns *NodeInfoGroup) hasMaster() bool {
 }
 
 func (ns *NodeInfoGroup) Slaves() []*NodeInfo {
-restart:
 	if !ns.hasMaster() {
 		for _, member := range ns.Members {
 			member.collect()
 		}
-		goto restart
 	}
 	sort.Sort(ns)
 	return ns.Members[1:]
