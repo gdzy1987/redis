@@ -2,6 +2,7 @@ package replication
 
 import (
 	"errors"
+	"io"
 	"time"
 
 	"github.com/dengzitong/redis/client"
@@ -20,14 +21,15 @@ func (resp *respServer) start() error {
 }
 
 type Replication struct {
-	Topologist topology.Topologist
-
+	Topologist   topology.Topologist
 	curTopMapped *topology.ToplogyMapped
 
 	changesC chan struct {
 		ni []*topology.NodeInfo
 		oi []*topology.NodeInfo
 	}
+
+	stge io.Writer
 
 	respSrv *respServer
 }
@@ -46,30 +48,30 @@ func NewReplication(topologist topology.Topologist) *Replication {
 }
 
 func (r *Replication) prepareNode(master *topology.NodeInfo) (*respServer, error) {
-	repl_cli, ip, port, err := master.Client()
+	replCli, ip, port, err := master.Client()
 	if err != nil {
 		return nil, err
 	}
 	if master.Ver > "4.0.0" {
-		if ok, err := client.String(repl_cli.Do("replconf", "listening-port", port)); err != nil {
+		if ok, err := client.String(replCli.Do("replconf", "listening-port", port)); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf listening-port error")
 		}
 
-		if ok, err := client.String(repl_cli.Do("replconf", "ip-address", ip)); err != nil {
+		if ok, err := client.String(replCli.Do("replconf", "ip-address", ip)); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf ip-address error")
 		}
 
-		if ok, err := client.String(repl_cli.Do("replconf", "capa", "eof")); err != nil {
+		if ok, err := client.String(replCli.Do("replconf", "capa", "eof")); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf capa eof error")
 		}
 
-		if ok, err := client.String(repl_cli.Do("replconf", "capa", "psync2")); err != nil {
+		if ok, err := client.String(replCli.Do("replconf", "capa", "psync2")); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf capa psync2 error")
@@ -78,16 +80,24 @@ func (r *Replication) prepareNode(master *topology.NodeInfo) (*respServer, error
 	runID := ""
 	if r.Topologist.Group(master).GroupOffset > 0 {
 		runID = "?"
-		repl_cli.Do("psync", runID, "-1")
+		replCli.Do("psync", runID, "-1")
 	} else {
-		repl_cli.Do("psync", master.Id, r.Topologist.Group(master).GroupOffset)
+		replCli.Do("psync", master.Id, r.Topologist.Group(master).GroupOffset)
 	}
-	return &respServer{cli: repl_cli}, nil
+	return &respServer{cli: replCli}, nil
 }
 
 func (r *Replication) DumpAndParse() {
 	stop := r.Topologist.Run()
-	defer stop()
+
+	defer func() {
+		stop()
+		err := r.Topologist.MarshalToWriter(r.stge)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	tops := r.Topologist.Topology()
 
 	// first initialization
@@ -105,9 +115,32 @@ func (r *Replication) DumpAndParse() {
 	// 1 second check
 	r.tickerOneSecCheck()
 
-	for {
-		<-r.changesC
+	r.whenChange()
 
+}
+
+func (r *Replication) whenChange() {
+	for {
+		notify, ok := <-r.changesC
+		if !ok {
+			return
+		}
+
+		for i := range notify.oi {
+			node := notify.oi[i]
+			r.Topologist.Group(node).CloseAllMember()
+		}
+
+		for i := range notify.ni {
+			node := notify.ni[i]
+			respSrv, err := r.prepareNode(node)
+			if err != nil {
+				panic(err)
+			}
+			if err := respSrv.start(); err != nil {
+				panic(err)
+			}
+		}
 	}
 }
 
