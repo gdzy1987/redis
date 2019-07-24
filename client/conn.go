@@ -169,7 +169,6 @@ func (c *Conn) DumpAndParse(parse func(io.Reader) error) error {
 			}
 		}
 	}(w)
-
 	for {
 		err := parse(r)
 		if err == nil {

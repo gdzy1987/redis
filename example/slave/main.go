@@ -17,7 +17,6 @@ type slave struct {
 func (s *slave) slaveOfMaster(masterAddr string) error {
 	cli := client.NewClient(masterAddr,
 		client.DialMaxIdelConns(1),
-		client.DialPassword("wtf"),
 	)
 
 	pool, err := cli.Get()
@@ -63,7 +62,7 @@ func (s *slave) slaveOfMaster(masterAddr string) error {
 
 	bufPool := sync.Pool{
 		New: func() interface{} {
-			return make([]byte, 1, 1)
+			return make([]byte, 1)
 		},
 	}
 	f := func(rd io.Reader) error {
@@ -86,7 +85,7 @@ func (s *slave) slaveOfMaster(masterAddr string) error {
 func main() {
 	_slave := &slave{}
 	log.SetOutput(os.Stdout)
-	err := _slave.slaveOfMaster("10.1.1.228:8003")
+	err := _slave.slaveOfMaster("127.0.0.1:6379")
 	if err != nil {
 		panic(err)
 	}
