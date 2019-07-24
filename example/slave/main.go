@@ -58,13 +58,13 @@ func (s *slave) listenAndSlaveSrve(masterAddr string) error {
 	}
 
 	f := func(rd io.Reader) error {
-		p := make([]byte, 32)
+		p := make([]byte, 1, 1)
 		_, err := io.ReadFull(rd, p)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("%s\n", p)
+		fmt.Printf("%s", p)
 		return nil
 	}
 

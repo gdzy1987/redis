@@ -163,23 +163,21 @@ func (c *Conn) DumpAndParse(parse func(io.Reader) error) error {
 	go func(w *io.PipeWriter) {
 		rd := c.respReader.self()
 		for {
-			_, err := io.Copy(w, rd)
-			if err == nil {
-				continue
-			} else {
+			_, err := io.CopyN(w, rd, 1)
+			if err != nil {
 				r.CloseWithError(err)
 			}
 		}
 	}(w)
-	var err error
+
 	for {
-		err = parse(r)
-		if err != nil {
-			w.CloseWithError(err)
-			break
+		err := parse(r)
+		if err == nil {
+			continue
 		}
+		w.CloseWithError(err)
+		return err
 	}
-	return err
 }
 
 // Receive RESP reply
