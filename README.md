@@ -48,7 +48,6 @@ func main() {
 }
 ```
 
-
 ### Analog a redis handler
 
 ```golang
