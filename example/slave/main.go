@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/dengzitong/redis/client"
 )
@@ -14,7 +15,10 @@ type slave struct {
 }
 
 func (s *slave) listenAndSlaveSrve(masterAddr string) error {
-	cli := client.NewClient(masterAddr, client.DialMaxIdelConns(1))
+	cli := client.NewClient(masterAddr,
+		client.DialMaxIdelConns(1),
+		client.DialPassword("wtf"),
+	)
 
 	pool, err := cli.Get()
 	if err != nil {
@@ -57,8 +61,16 @@ func (s *slave) listenAndSlaveSrve(masterAddr string) error {
 		return err
 	}
 
+	bufPool := sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 1, 1)
+		},
+	}
 	f := func(rd io.Reader) error {
-		p := make([]byte, 1, 1)
+		p := bufPool.Get().([]byte)
+		defer func() {
+			bufPool.Put(p)
+		}()
 		_, err := io.ReadFull(rd, p)
 		if err != nil {
 			return err
@@ -74,7 +86,7 @@ func (s *slave) listenAndSlaveSrve(masterAddr string) error {
 func main() {
 	_slave := &slave{}
 	log.SetOutput(os.Stdout)
-	err := _slave.listenAndSlaveSrve("127.0.0.1:6379")
+	err := _slave.listenAndSlaveSrve("10.1.1.228:8003")
 	if err != nil {
 		panic(err)
 	}
