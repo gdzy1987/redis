@@ -14,7 +14,7 @@ import (
 type slave struct {
 }
 
-func (s *slave) listenAndSlaveSrve(masterAddr string) error {
+func (s *slave) slaveOfMaster(masterAddr string) error {
 	cli := client.NewClient(masterAddr,
 		client.DialMaxIdelConns(1),
 		client.DialPassword("wtf"),
@@ -86,7 +86,7 @@ func (s *slave) listenAndSlaveSrve(masterAddr string) error {
 func main() {
 	_slave := &slave{}
 	log.SetOutput(os.Stdout)
-	err := _slave.listenAndSlaveSrve("10.1.1.228:8003")
+	err := _slave.slaveOfMaster("10.1.1.228:8003")
 	if err != nil {
 		panic(err)
 	}
