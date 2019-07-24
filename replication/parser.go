@@ -282,11 +282,11 @@ func (d *rdbDecode) readStreamID() (uint64, uint64, error) {
 		return 0, 0, err
 	}
 	slb := newSliceBuffer(entrys)
-	ms, err := slb.Slice(8)
+	ms, err := slb.slice(8)
 	if err != nil {
 		return 0, 0, err
 	}
-	seq, _ := slb.Slice(8)
+	seq, _ := slb.slice(8)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -319,9 +319,9 @@ func (d *rdbDecode) readStream(key []byte, expiry int64) error {
 
 		// skip
 		// total-bytes 4
-		listpack.Skip(4)
+		listpack.skip(4)
 		// num-elements 2
-		listpack.Skip(2)
+		listpack.skip(2)
 
 		/*
 		 * Master entry
@@ -466,7 +466,7 @@ func (d *rdbDecode) readStream(key []byte, expiry int64) error {
 			readListPackV2(listpack) // lp-count
 		}
 
-		eb, err := listpack.ReadByte() // lp-end
+		eb, err := listpack.readByte() // lp-end
 		if err != nil {
 			return err
 		}
@@ -555,7 +555,7 @@ func (d *rdbDecode) readZipmap(key []byte, expiry int64) error {
 		return err
 	}
 	buf := newSliceBuffer(zipmap)
-	lenByte, err := buf.ReadByte()
+	lenByte, err := buf.readByte()
 	if err != nil {
 		return err
 	}
@@ -592,11 +592,11 @@ func readZipmapItem(buf *sliceBuffer, readFree bool) ([]byte, error) {
 	if length == -1 {
 		return nil, nil
 	}
-	value, err := buf.Slice(length)
+	value, err := buf.slice(length)
 	if err != nil {
 		return nil, err
 	}
-	_, err = buf.Seek(int64(free), 1)
+	_, err = buf.seek(int64(free), 1)
 	return value, err
 }
 
@@ -610,24 +610,24 @@ func countZipmapItems(buf *sliceBuffer) (int, error) {
 		if strLen == -1 {
 			break
 		}
-		_, err = buf.Seek(int64(strLen)+int64(free), 1)
+		_, err = buf.seek(int64(strLen)+int64(free), 1)
 		if err != nil {
 			return 0, err
 		}
 		n++
 	}
-	_, err := buf.Seek(0, 0)
+	_, err := buf.seek(0, 0)
 	return n, err
 }
 
 func readZipmapItemLength(buf *sliceBuffer, readFree bool) (int, int, error) {
-	b, err := buf.ReadByte()
+	b, err := buf.readByte()
 	if err != nil {
 		return 0, 0, err
 	}
 	switch b {
 	case 253:
-		s, err := buf.Slice(5)
+		s, err := buf.slice(5)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -639,7 +639,7 @@ func readZipmapItemLength(buf *sliceBuffer, readFree bool) (int, int, error) {
 	}
 	var free byte
 	if readFree {
-		free, err = buf.ReadByte()
+		free, err = buf.readByte()
 	}
 	return int(b), int(free), err
 }
@@ -665,72 +665,72 @@ func readZipmapItemLength(buf *sliceBuffer, readFree bool) (int, int, error) {
 
 func readListPackV2(slice *sliceBuffer) (value []byte, err error) {
 	var special byte
-	if special, err = slice.ReadByte(); err != nil {
+	if special, err = slice.readByte(); err != nil {
 		return nil, err
 	}
 	if (special & rdbLpEncoding7BitUintMask) == rdbLpEncoding7BitUint { // mask 128 -> 0xxx xxxx
-		slice.Skip(1)
+		slice.skip(1)
 		value = i642bytes((uint64(special) & 0x7f)) //  0x7f 127
 
 	} else if (special & rdbLpEncoding6BitStrMask) == rdbLpEncoding6BitStr { // mask 192 -> 00xx xxxx
 		len := special & 0x3f // 0x3f  63
 		skip := 1 + int(len)
-		value, err = slice.First(int(len))
+		value, err = slice.first(int(len))
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(int(skip))
+		slice.skip(int(skip))
 
 	} else if (special & rdbLpEncoding13BitIntMask) == rdbLpEncoding13BitInt { // mask 224 -> 000x xxxx
-		next, err := slice.ReadByte()
+		next, err := slice.readByte()
 		if err != nil {
 			return nil, err
 		}
 		value = i642bytes(((uint64(special&0x1f) << 8) | uint64(next)))
-		slice.Skip(2)
+		slice.skip(2)
 
 	} else if (special & rdbLpEncoding16BitIntMask) == rdbLpEncoding16BitInt { // mask 255
-		value, err = slice.First(2)
+		value, err = slice.first(2)
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(3)
+		slice.skip(3)
 
 	} else if (special & rdbLpEncoding24BitIntMask) == rdbLpEncoding24BitInt {
-		value, err = slice.First(3)
+		value, err = slice.first(3)
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(4)
+		slice.skip(4)
 
 	} else if (special & rdbLpEncoding32BitIntMask) == rdbLpEncoding32BitInt {
-		value, err = slice.First(4)
+		value, err = slice.first(4)
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(5)
+		slice.skip(5)
 
 	} else if (special & rdbLpEncoding64BitIntMask) == rdbLpEncoding64BitInt {
-		value, err = slice.First(8)
+		value, err = slice.first(8)
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(9)
+		slice.skip(9)
 
 	} else if (special & rdbLpEncoding12BitStrMask) == rdbLpEncoding12BitStr {
-		b, err := slice.ReadByte()
+		b, err := slice.readByte()
 		if err != nil {
 			return nil, err
 		}
 		len := ((uint64(special) & 0x0f) << 8) | uint64(b)
-		value, err = slice.First(int(len))
+		value, err = slice.first(int(len))
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(2 + int(len))
+		slice.skip(2 + int(len))
 
 	} else if (special & rdbLpEncoding32BitStrMask) == rdbLpEncoding32BitStr {
-		len, err := slice.First(4)
+		len, err := slice.first(4)
 		if err != nil {
 			return nil, err
 		}
@@ -738,11 +738,11 @@ func readListPackV2(slice *sliceBuffer) (value []byte, err error) {
 		if err != nil {
 			return nil, err
 		}
-		value, err = slice.First(int(realLength))
+		value, err = slice.first(int(realLength))
 		if err != nil {
 			return nil, err
 		}
-		slice.Skip(5 + int(realLength))
+		slice.skip(5 + int(realLength))
 
 	} else {
 		return nil, errors.Errorf("Unsupported operation exception %q\n", special)
@@ -870,8 +870,8 @@ func (d *rdbDecode) readZiplistHash(key []byte, expiry int64) error {
 }
 
 func readZiplistLength(buf *sliceBuffer) (int64, error) {
-	buf.Seek(8, 0) // skip the zlbytes and zltail
-	lenBytes, err := buf.Slice(2)
+	buf.seek(8, 0) // skip the zlbytes and zltail
+	lenBytes, err := buf.slice(2)
 	if err != nil {
 		return 0, err
 	}
@@ -879,60 +879,60 @@ func readZiplistLength(buf *sliceBuffer) (int64, error) {
 }
 
 func readZiplistEntry(buf *sliceBuffer) ([]byte, error) {
-	prevLen, err := buf.ReadByte()
+	prevLen, err := buf.readByte()
 	if err != nil {
 		return nil, err
 	}
 	if prevLen == 254 {
-		buf.Seek(4, 1) // skip the 4-byte prevlen
+		buf.seek(4, 1) // skip the 4-byte prevlen
 	}
 
-	header, err := buf.ReadByte()
+	header, err := buf.readByte()
 	if err != nil {
 		return nil, err
 	}
 	switch {
 	case header>>6 == rdbZiplist6bitlenString:
-		return buf.Slice(int(header & 0x3f))
+		return buf.slice(int(header & 0x3f))
 	case header>>6 == rdbZiplist14bitlenString:
-		b, err := buf.ReadByte()
+		b, err := buf.readByte()
 		if err != nil {
 			return nil, err
 		}
-		return buf.Slice((int(header&0x3f) << 8) | int(b))
+		return buf.slice((int(header&0x3f) << 8) | int(b))
 	case header>>6 == rdbZiplist32bitlenString:
-		lenBytes, err := buf.Slice(4)
+		lenBytes, err := buf.slice(4)
 		if err != nil {
 			return nil, err
 		}
-		return buf.Slice(int(binary.BigEndian.Uint32(lenBytes)))
+		return buf.slice(int(binary.BigEndian.Uint32(lenBytes)))
 	case header == rdbZiplistInt16:
-		intBytes, err := buf.Slice(2)
+		intBytes, err := buf.slice(2)
 		if err != nil {
 			return nil, err
 		}
 		return []byte(strconv.FormatInt(int64(int16(binary.LittleEndian.Uint16(intBytes))), 10)), nil
 	case header == rdbZiplistInt32:
-		intBytes, err := buf.Slice(4)
+		intBytes, err := buf.slice(4)
 		if err != nil {
 			return nil, err
 		}
 		return []byte(strconv.FormatInt(int64(int32(binary.LittleEndian.Uint32(intBytes))), 10)), nil
 	case header == rdbZiplistInt64:
-		intBytes, err := buf.Slice(8)
+		intBytes, err := buf.slice(8)
 		if err != nil {
 			return nil, err
 		}
 		return []byte(strconv.FormatInt(int64(binary.LittleEndian.Uint64(intBytes)), 10)), nil
 	case header == rdbZiplistInt24:
 		intBytes := make([]byte, 4)
-		_, err := buf.Read(intBytes[1:])
+		_, err := buf.read(intBytes[1:])
 		if err != nil {
 			return nil, err
 		}
 		return []byte(strconv.FormatInt(int64(int32(binary.LittleEndian.Uint32(intBytes))>>8), 10)), nil
 	case header == rdbZiplistInt8:
-		b, err := buf.ReadByte()
+		b, err := buf.readByte()
 		return []byte(strconv.FormatInt(int64(int8(b)), 10)), err
 	case header>>4 == rdbZiplistInt4:
 		return []byte(strconv.FormatInt(int64(header&0x0f)-1, 10)), nil
@@ -947,7 +947,7 @@ func (d *rdbDecode) readIntset(key []byte, expiry int64) error {
 		return err
 	}
 	buf := newSliceBuffer(intset)
-	intSizeBytes, err := buf.Slice(4)
+	intSizeBytes, err := buf.slice(4)
 	if err != nil {
 		return err
 	}
@@ -957,7 +957,7 @@ func (d *rdbDecode) readIntset(key []byte, expiry int64) error {
 		return fmt.Errorf("rdb: unknown intset encoding: %d", intSize)
 	}
 
-	lenBytes, err := buf.Slice(4)
+	lenBytes, err := buf.slice(4)
 	if err != nil {
 		return err
 	}
@@ -965,7 +965,7 @@ func (d *rdbDecode) readIntset(key []byte, expiry int64) error {
 
 	d.event.BeginSet(key, int64(cardinality), expiry)
 	for i := uint32(0); i < cardinality; i++ {
-		intBytes, err := buf.Slice(int(intSize))
+		intBytes, err := buf.slice(int(intSize))
 		if err != nil {
 			return err
 		}
