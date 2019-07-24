@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"errors"
+	"fmt"
+	"io"
 	"log"
-	"net"
 	"os"
-	"strings"
 
 	"github.com/dengzitong/redis/client"
 )
@@ -53,37 +52,23 @@ func (s *slave) listenAndSlaveSrve(masterAddr string) error {
 		return errors.New("replconf capa psync2 error")
 	}
 
-	reply, err := client.String(cli.Do("psync", "?", "-1"))
-	if err != nil {
-		return err
-	}
-	log.Printf("%s", reply)
-
-	ln, err := net.Listen("tcp", strings.Join([]string{ip, port}, ":"))
+	err = pool.Send("psync", "?", "-1")
 	if err != nil {
 		return err
 	}
 
-	log.Printf("slave listen on %s\n", strings.Join([]string{ip, port}, ":"))
-
-	co, err := ln.Accept()
-	if err != nil {
-		return err
-	}
-
-	return s.handle(co)
-}
-
-func (s *slave) handle(co net.Conn) error {
-	br := bufio.NewReader(co)
-	rReader := client.NewRespReader(br)
-	for {
-		bbs, err := rReader.ParseRequest()
+	f := func(rd io.Reader) error {
+		p := make([]byte, 32)
+		_, err := io.ReadFull(rd, p)
 		if err != nil {
 			return err
 		}
-		log.Printf("xxxxx %s\n", bbs)
+
+		fmt.Printf("%s\n", p)
+		return nil
 	}
+
+	return pool.DumpAndParse(f)
 }
 
 func main() {

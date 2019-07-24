@@ -28,6 +28,8 @@ func NewRespReader(br *bufio.Reader) *RespReader {
 	return r
 }
 
+func (resp *RespReader) self() *bufio.Reader { return resp.br }
+
 // Parse RESP
 func (resp *RespReader) Parse() (interface{}, error) {
 	line, err := readLine(resp.br)
@@ -113,13 +115,6 @@ func (resp *RespReader) ParseRequest() ([][]byte, error) {
 	default:
 		return nil, fmt.Errorf("not invalid array of bulk string type, but %c", line[0])
 	}
-}
-
-func (resp *RespReader) dump(w io.Writer) error {
-	pipeReader, pippeWriter := io.Pipe()
-
-	
-	return nil
 }
 
 // Parse bulk string and write it with writer w

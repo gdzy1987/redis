@@ -158,6 +158,30 @@ func (c *Conn) Send(cmd string, args ...interface{}) error {
 	return nil
 }
 
+func (c *Conn) DumpAndParse(parse func(io.Reader) error) error {
+	r, w := io.Pipe()
+	go func(w *io.PipeWriter) {
+		rd := c.respReader.self()
+		for {
+			_, err := io.Copy(w, rd)
+			if err == nil {
+				continue
+			} else {
+				r.CloseWithError(err)
+			}
+		}
+	}(w)
+	var err error
+	for {
+		err = parse(r)
+		if err != nil {
+			w.CloseWithError(err)
+			break
+		}
+	}
+	return err
+}
+
 // Receive RESP reply
 func (c *Conn) Receive() (interface{}, error) {
 	if reply, err := c.respReader.Parse(); err != nil {
@@ -181,10 +205,6 @@ func (c *Conn) ReceiveBulkTo(w io.Writer) error {
 		}
 	}
 	return err
-}
-
-func (c *Conn) DownTo(w io.WriteCloser) error {
-
 }
 
 // Receive RESP command request, must array of bulk stirng
