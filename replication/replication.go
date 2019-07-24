@@ -91,10 +91,11 @@ func (r *Replication) DumpAndParse() {
 	stop := r.Topologist.Run()
 
 	defer func() {
+		// finally,need to close the resource and persist the data.
 		stop()
 		err := r.Topologist.MarshalToWriter(r.stge)
 		if err != nil {
-			panic(err)
+			println(err)
 		}
 	}()
 

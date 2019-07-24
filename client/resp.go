@@ -115,6 +115,13 @@ func (resp *RespReader) ParseRequest() ([][]byte, error) {
 	}
 }
 
+func (resp *RespReader) dump(w io.Writer) error {
+	pipeReader, pippeWriter := io.Pipe()
+
+	
+	return nil
+}
+
 // Parse bulk string and write it with writer w
 func (resp *RespReader) ParseBulkTo(w io.Writer) error {
 	line, err := readLine(resp.br)

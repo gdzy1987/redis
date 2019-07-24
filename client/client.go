@@ -10,7 +10,7 @@ import (
 
 type PoolConn struct {
 	*Conn
-	c *Client
+	*Client
 }
 
 func (c *PoolConn) Close() {
@@ -18,7 +18,7 @@ func (c *PoolConn) Close() {
 		return
 	}
 
-	c.c.put(c.Conn)
+	c.put(c.Conn)
 }
 
 // force close inner connection and not put it into pool

@@ -183,6 +183,10 @@ func (c *Conn) ReceiveBulkTo(w io.Writer) error {
 	return err
 }
 
+func (c *Conn) DownTo(w io.WriteCloser) error {
+
+}
+
 // Receive RESP command request, must array of bulk stirng
 func (c *Conn) ReceiveRequest() ([][]byte, error) {
 	return c.respReader.ParseRequest()
