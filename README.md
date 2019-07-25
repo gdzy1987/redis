@@ -178,3 +178,4 @@ func main() {
 echo "set x 123" | redis-cli -p 9999
 echo "get x" | redis-cli -p 9999
 ```
+# redis
