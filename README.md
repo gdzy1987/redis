@@ -1,5 +1,6 @@
 # redis
-Redis utility collection
+Submitted from dengzitong
+redis utility collection
 
 ### client
 
