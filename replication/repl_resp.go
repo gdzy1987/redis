@@ -167,7 +167,7 @@ func (v Value) Array() []Value {
 //   ':'  Integer
 //   '$'  BulkString
 //   '*'  Array
-//   'R' Rdb
+//   'R'  Rdb
 //   '\r' Crlf
 func (v Value) Type() Type {
 	if bytes.HasPrefix(v.Str, []byte(`FULLRESYNC`)) || bytes.HasPrefix(v.Str, []byte(`+FULLRESYNC`)) {

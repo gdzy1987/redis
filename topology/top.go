@@ -47,7 +47,11 @@ type (
 
 type ToplogyMapped map[*NodeInfo][]*NodeInfo
 
-func (t *ToplogyMapped) Compares(cur *ToplogyMapped) (newNodes []*NodeInfo, oldNodes []*NodeInfo, hasChanged bool) {
+func (t *ToplogyMapped) Compares(cur *ToplogyMapped) (
+	newNodes []*NodeInfo,
+	oldNodes []*NodeInfo,
+	hasChanged bool,
+) {
 	for i, v := range *t {
 		if _, ok := (*cur)[i]; !ok {
 			if oldNodes == nil {

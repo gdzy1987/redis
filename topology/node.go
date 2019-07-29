@@ -135,7 +135,7 @@ func CreateNodeInfoGroup() *NodeInfoGroup {
 		UUID:        NewSUID().String(),
 		Members:     make([]*NodeInfo, 0),
 		MemberIds:   make([]string, 0),
-		GroupOffset: -1,
+		GroupOffset: 0,
 	}
 }
 
@@ -211,9 +211,9 @@ func (ns *NodeInfoGroup) CloseAllMember() {
 }
 
 func (ns *NodeInfoGroup) Update(offset int64) {
-	ns.GroupOffset = offset
+	atomic.AddInt64(&ns.GroupOffset, offset)
 }
 
 func (ns *NodeInfoGroup) Offset() string {
-	return fmt.Sprintf("%d", ns.GroupOffset)
+	return fmt.Sprintf("%d", atomic.LoadInt64(&ns.GroupOffset))
 }

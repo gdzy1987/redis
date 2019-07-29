@@ -198,11 +198,12 @@ const (
 
 var (
 	CommandTypeMap = map[string]CommandType{
+		"ping":             Ping,
 		"select":           Select,
 		"zadd":             Zadd,
 		"sadd":             Sadd,
 		"zrem":             Zrem,
-		"delete":           Delete,
+		"del":              Delete,
 		"lpush":            Lpush,
 		"lpushx":           LpushX,
 		"rpush":            Rpush,
@@ -262,11 +263,12 @@ var (
 	}
 
 	CommandNameMap = map[CommandType]string{
+		Ping:             "ping",
 		Select:           "select",
 		Zadd:             "zadd",
 		Sadd:             "sadd",
 		Zrem:             "zrem",
-		Delete:           "delete",
+		Delete:           "del",
 		Lpush:            "lpush",
 		LpushX:           "lpushx",
 		Rpush:            "rpush",
