@@ -26,25 +26,22 @@ type NodeInfo struct {
 
 func CreateNodeInfo(addr string, pass string) *NodeInfo {
 	return &NodeInfo{
-		Addr: addr,
-		Pass: pass,
+		Addr:   addr,
+		Pass:   pass,
+		Offset: -1,
 	}
 }
 
-func (n *NodeInfo) Client() (*client.Client, string, string, error) {
-	pool, err := n.c.Get()
+func (n *NodeInfo) ExclusiveConn() (*client.Conn, string, string, error) {
+	pc, err := n.c.Get()
 	if err != nil {
 		return nil, "", "", err
 	}
-	ip, port, err := pool.Conn.Addr()
+	ip, port, err := pc.Conn.Addr()
 	if err != nil {
 		return nil, "", "", err
 	}
-	newCli, err := client.UseAlreadyConn(pool.Conn)
-	if err != nil {
-		return nil, "", "", err
-	}
-	return newCli, ip, port, nil
+	return pc.Conn, ip, port, nil
 }
 
 func (n *NodeInfo) Stop() {
@@ -135,9 +132,10 @@ type NodeInfoGroup struct {
 
 func CreateNodeInfoGroup() *NodeInfoGroup {
 	return &NodeInfoGroup{
-		UUID:      NewSUID().String(),
-		Members:   make([]*NodeInfo, 0),
-		MemberIds: make([]string, 0),
+		UUID:        NewSUID().String(),
+		Members:     make([]*NodeInfo, 0),
+		MemberIds:   make([]string, 0),
+		GroupOffset: -1,
 	}
 }
 

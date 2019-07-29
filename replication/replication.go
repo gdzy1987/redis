@@ -2,27 +2,56 @@ package replication
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"sync"
 	"time"
 
-	"github.com/dengzitong/redis/client"
+	cli "github.com/dengzitong/redis/client"
 	"github.com/dengzitong/redis/topology"
 )
 
 var OKReply = "OK"
 
 type respServer struct {
-	cli *client.Client
-	br  ByteReader
+	runID  string
+	offset string
+
+	co *cli.Conn
+
+	bpool sync.Pool
 }
 
-func (resp *respServer) start() error {
+func (resp *respServer) pull() error {
+	err := resp.co.Send("psync", resp.runID, resp.offset)
+	if err != nil {
+		return err
+	}
+	return resp.co.DumpAndParse(resp.parse)
+}
+
+func (resp *respServer) close() {
+	resp.co.Close()
+}
+
+func (resp *respServer) parse(rd io.Reader) error {
+	p := resp.bpool.Get().([]byte)
+	defer func() {
+		resp.bpool.Put(p)
+	}()
+	_, err := io.ReadFull(rd, p)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s", p)
 	return nil
 }
 
 type Replication struct {
-	Topologist   topology.Topologist
-	curTopMapped *topology.ToplogyMapped
+	toplogyist topology.Topologist
+
+	tmapped *topology.ToplogyMapped
 
 	changesC chan struct {
 		ni []*topology.NodeInfo
@@ -30,94 +59,107 @@ type Replication struct {
 	}
 
 	stge io.Writer
-
-	respSrv *respServer
 }
 
-func NewReplication(topologist topology.Topologist) *Replication {
+func NewReplication(t topology.Topologist, stge io.Writer) *Replication {
 	repl := &Replication{
 		changesC: make(chan struct {
 			ni []*topology.NodeInfo
 			oi []*topology.NodeInfo
 		},
 		),
-		Topologist: topologist,
+		toplogyist: t,
+
+		stge: stge,
 	}
 
 	return repl
 }
 
 func (r *Replication) prepareNode(master *topology.NodeInfo) (*respServer, error) {
-	replCli, ip, port, err := master.Client()
+	conn, ip, port, err := master.ExclusiveConn()
 	if err != nil {
 		return nil, err
 	}
 	if master.Ver > "4.0.0" {
-		if ok, err := client.String(replCli.Do("replconf", "listening-port", port)); err != nil {
+		if ok, err := cli.String(conn.Do("replconf", "listening-port", port)); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf listening-port error")
 		}
 
-		if ok, err := client.String(replCli.Do("replconf", "ip-address", ip)); err != nil {
+		if ok, err := cli.String(conn.Do("replconf", "ip-address", ip)); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf ip-address error")
 		}
 
-		if ok, err := client.String(replCli.Do("replconf", "capa", "eof")); err != nil {
+		if ok, err := cli.String(conn.Do("replconf", "capa", "eof")); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf capa eof error")
 		}
 
-		if ok, err := client.String(replCli.Do("replconf", "capa", "psync2")); err != nil {
+		if ok, err := cli.String(conn.Do("replconf", "capa", "psync2")); err != nil {
 			return nil, err
 		} else if ok != OKReply {
 			return nil, errors.New("replconf capa psync2 error")
 		}
 	}
-	runID := ""
-	if r.Topologist.Group(master).GroupOffset > 0 {
-		runID = "?"
-		replCli.Do("psync", runID, "-1")
-	} else {
-		replCli.Do("psync", master.Id, r.Topologist.Group(master).GroupOffset)
+	runID := "?"
+	var offset int64 = -1
+	globalOffset := r.toplogyist.Group(master).GroupOffset
+	if globalOffset > 0 {
+		runID = master.Id
+		offset = globalOffset
 	}
-	return &respServer{cli: replCli}, nil
+
+	respSrv := &respServer{
+		runID:  runID,
+		offset: fmt.Sprintf("%d", offset),
+		co:     conn,
+		bpool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 1)
+			},
+		},
+	}
+
+	return respSrv, nil
 }
 
-func (r *Replication) DumpAndParse() {
-	stop := r.Topologist.Run()
+func (r *Replication) Start() (func(), error) {
+	stop := r.toplogyist.Run()
 
-	defer func() {
+	cancel := func() {
 		// finally,need to close the resource and persist the data.
 		stop()
-		err := r.Topologist.MarshalToWriter(r.stge)
+		err := r.toplogyist.MarshalToWriter(r.stge)
 		if err != nil {
 			println(err)
 		}
-	}()
+	}
 
-	tops := r.Topologist.Topology()
+	tops := r.toplogyist.Topology()
 
 	// first initialization
 	for m, _ := range *tops {
 		respSrv, err := r.prepareNode(m)
 		if err != nil {
-			panic(err)
+			return cancel, err
 		}
-		if err := respSrv.start(); err != nil {
-			panic(err)
+		if err := respSrv.pull(); err != nil {
+			return cancel, err
 		}
 	}
-	r.curTopMapped = tops
+	r.tmapped = tops
 
 	// 1 second check
-	r.tickerOneSecCheck()
+	go r.everyOneSecCheck()
 
-	r.whenChange()
+	go r.whenChange()
 
+	return cancel, nil
 }
 
 func (r *Replication) whenChange() {
@@ -129,7 +171,7 @@ func (r *Replication) whenChange() {
 
 		for i := range notify.oi {
 			node := notify.oi[i]
-			r.Topologist.Group(node).CloseAllMember()
+			r.toplogyist.Group(node).CloseAllMember()
 		}
 
 		for i := range notify.ni {
@@ -138,21 +180,21 @@ func (r *Replication) whenChange() {
 			if err != nil {
 				panic(err)
 			}
-			if err := respSrv.start(); err != nil {
+			if err := respSrv.pull(); err != nil {
 				panic(err)
 			}
 		}
 	}
 }
 
-func (r *Replication) tickerOneSecCheck() {
+func (r *Replication) everyOneSecCheck() {
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			cur := r.Topologist.Topology()
-			ni, oi, hasChanged := r.curTopMapped.Compares(cur)
+			cur := r.toplogyist.Topology()
+			ni, oi, hasChanged := r.tmapped.Compares(cur)
 			if !hasChanged {
 				continue
 			}

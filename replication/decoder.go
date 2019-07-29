@@ -1,13 +1,13 @@
 package replication
 
 import (
-	"bufio"
 	"io"
 )
 
 type ByteReader interface {
 	io.Reader
-	io.ByteScanner // io.ByteReader
+	// io.ByteReader
+	io.ByteScanner
 }
 
 // A Decodr must be implemented to parse a RDB io.Reader &  parse a command io.Reader
@@ -73,10 +73,6 @@ type Decoder interface {
 	ResizeDatabase(dbSize, expiresSize uint32)
 }
 
-type Closer interface {
-	io.Closer
-}
-
 // Nop may be embedded in a real Decoder to avoid implementing methods.
 type Nop struct{}
 
@@ -102,18 +98,3 @@ func (d Nop) EndZSet(key []byte)                                {}
 func (d Nop) BeginStream(key []byte, cardinality, expiry int64) {}
 func (d Nop) Xadd(key, id, listpack []byte)                     {}
 func (d Nop) EndStream(key []byte)                              {}
-
-// RdbParser need extend concrete implement.
-type RdbParser interface {
-	Parse(Decoder) error
-}
-
-func NewRdbParser(ir io.Reader) RdbParser {
-	decoder := &rdbDecode{
-		intBuf: make([]byte, 8),
-
-		r: bufio.NewReader(ir),
-	}
-
-	return decoder
-}

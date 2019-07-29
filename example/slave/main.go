@@ -11,6 +11,7 @@ import (
 	"github.com/dengzitong/redis/client"
 )
 
+// Simulate the slave server, download only rdb and aof
 type slave struct {
 }
 
