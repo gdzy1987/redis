@@ -1,2 +1,4 @@
+github.com/dengzitong/redis v0.0.0-20190729151040-dd03fdab59ba h1:EYY59JDtv+9/14HIjaNsUtSVTwcwmlwYn+ae6oZ5FXw=
+github.com/dengzitong/redis v0.0.0-20190729151040-dd03fdab59ba/go.mod h1:hIH7kEZSxqXqATbv/DCLlc7UBvPVNqbubJX3BZn/vk4=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
