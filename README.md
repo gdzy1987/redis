@@ -3,6 +3,8 @@
 Submitted from iauto360x
 redis utility collection
 
+### More examples 
+[example url](https://github.com/iauto360x/redis/tree/master/example "more example")
 ### client
 
 ```golang
@@ -180,4 +182,4 @@ func main() {
 echo "set x 123" | redis-cli -p 9999
 echo "get x" | redis-cli -p 9999
 ```
-# redis
+
