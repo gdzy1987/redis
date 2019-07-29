@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/dengzitong/redis/topology"
+	"github.com/iauto360x/redis/topology"
 )
 
 func jsonPrettyPrint(in string) string {

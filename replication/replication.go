@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	cli "github.com/dengzitong/redis/client"
-	tp "github.com/dengzitong/redis/topology"
+	cli "github.com/iauto360x/redis/client"
+	tp "github.com/iauto360x/redis/topology"
 )
 
 var OKReply = "OK"

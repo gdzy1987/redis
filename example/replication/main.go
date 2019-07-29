@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	r "github.com/dengzitong/redis/replication"
-	t "github.com/dengzitong/redis/topology"
+	r "github.com/iauto360x/redis/replication"
+	t "github.com/iauto360x/redis/topology"
 )
 
 type outerImpl struct{}

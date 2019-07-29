@@ -1,6 +1,6 @@
 # redis
 
-Submitted from dengzitong
+Submitted from iauto360x
 redis utility collection
 
 ### client
@@ -12,7 +12,7 @@ import (
     "fmt"
     "time"
 
-    client "github.com/dengzitong/redis/client"
+    client "github.com/iauto360x/redis/client"
 )
 
 func main() {
@@ -61,7 +61,7 @@ import (
     "os"
     "strings"
 
-    redis "github.com/dengzitong/redis/client"
+    redis "github.com/iauto360x/redis/client"
 )
 
 var (

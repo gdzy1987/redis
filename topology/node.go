@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/dengzitong/redis/client"
+	"github.com/iauto360x/redis/client"
 )
 
 func concat(strs ...string) string { return strings.Join(strs, ":") }

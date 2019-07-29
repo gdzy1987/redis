@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	client "github.com/dengzitong/redis/client"
+	client "github.com/iauto360x/redis/client"
 )
 
 func main() {

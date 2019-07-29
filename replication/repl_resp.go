@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dengzitong/redis/hack"
+	"github.com/iauto360x/redis/hack"
 )
 
 const bufsz = 4096

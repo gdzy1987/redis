@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	redis "github.com/dengzitong/redis/client"
+	redis "github.com/iauto360x/redis/client"
 )
 
 var (

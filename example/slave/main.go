@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dengzitong/redis/client"
+	"github.com/iauto360x/redis/client"
 )
 
 // Simulate the slave server, download only rdb and aof

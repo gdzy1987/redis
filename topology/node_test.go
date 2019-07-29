@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dengzitong/redis/client"
+	"github.com/iauto360x/redis/client"
 )
 
 func port(s string) string {

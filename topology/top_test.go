@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/dengzitong/redis/client"
+	"github.com/iauto360x/redis/client"
 )
 
 var _ = io.Writer(&dstTest{})

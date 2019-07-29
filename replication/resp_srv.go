@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	cli "github.com/dengzitong/redis/client"
-	"github.com/dengzitong/redis/topology"
+	cli "github.com/iauto360x/redis/client"
+	"github.com/iauto360x/redis/topology"
 )
 
 type respServer struct {
